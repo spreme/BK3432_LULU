@@ -139,5 +139,7 @@ unsigned short pwm_capture_value_get(unsigned char ucChannel);
 void pwm_int_handler_clear(unsigned char ucChannel);
 
 void pwm_isr(void);
+
+void pwm_set_duty(PWM_DRV_DESC *pwm_drv_desc);
  
 #endif // _PWM_H_

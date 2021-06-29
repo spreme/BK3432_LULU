@@ -83,7 +83,7 @@ static int oads_ffc1_upd_req_handler(ke_msg_id_t const msgid,
                                             ke_task_id_t const dest_id,
                                             ke_task_id_t const src_id)
 {
-	uart_putchar("oads_ffc1_upd_req_handler \r\n");
+	UART_PUTCHAR("oads_ffc1_upd_req_handler \r\n");
 
     int msg_status = KE_MSG_SAVED;
 	

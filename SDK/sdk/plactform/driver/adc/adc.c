@@ -2,13 +2,12 @@
 #include <string.h>        // string manipulation
 #include <stddef.h>     // standard definition
 #include "BK3432_reg.h"
+#include "rf.h"
 #include "uart.h"
 #include "gpio.h"
 #include "adc.h"
 
-
-
-void adc_init(uint8_t channel,uint8_t mode)
+void adc_init(uint8_t mode)
 {
 	uint32_t cfg;
 
@@ -18,10 +17,11 @@ void adc_init(uint8_t channel,uint8_t mode)
 	REG_AHB0_ICU_ADCCLKCON = (0x5 << 1);
 		
 	//set special as peripheral func
-	gpio_config(0x30 + channel,FLOAT,PULL_NONE);
+	gpio_config(GPIOD_0 + 2,FLOAT,PULL_NONE);
 
 	//set adc mode/channel/wait clk
-	cfg  = ( (mode << BIT_ADC_MODE ) | (channel << BIT_ADC_CHNL) | (0x01 << BIT_ADC_WAIT_CLK_SETTING));
+	//cfg  = ( (mode << BIT_ADC_MODE ) | (chanle << BIT_ADC_CHNL) | (0x01 << BIT_ADC_WAIT_CLK_SETTING));
+	cfg  = ( (mode << BIT_ADC_MODE )  | (0x01 << BIT_ADC_WAIT_CLK_SETTING));
 	REG_APB7_ADC_CFG =  cfg;
 
 	//set adc sample rate/pre div
@@ -33,9 +33,9 @@ void adc_init(uint8_t channel,uint8_t mode)
 	REG_APB7_ADC_CFG =  cfg;
 
 	REG_APB7_ADC_CFG |= (0x01 << BIT_ADC_INT_CLEAR);
-	//REG_APB7_ADC_CFG |= (0x01 << BIT_ADC_EN);//不能先使能ADC，不然ADC FIFO满时没有读出再次启动ADC就不会有中断
+	//REG_APB7_ADC_CFG |= (0x01 << BIT_ADC_EN);
 	
-	
+	REG_AHB0_ICU_INT_ENABLE |= (0x01 << 8); 
 }
 
 void adc_deinit(uint8_t channel)
@@ -47,40 +47,45 @@ void adc_deinit(uint8_t channel)
     REG_AHB0_ICU_INT_ENABLE &= ~(0x01 << 8); 
 }
 
-
 uint16_t g_adc_value,adc_flag;
 
 void adc_isr(void)
 {
-    REG_APB7_ADC_CFG |= (0x01 << BIT_ADC_INT_CLEAR);
+	REG_APB7_ADC_CFG |= (0x01 << BIT_ADC_INT_CLEAR);
     adc_flag=1;	
 }
 
-uint16_t adc_get_value(void)
+uint16_t adc_get_value(uint8_t chanle)
 {
-    uint16_t adc_cnt=0;
-    adc_flag =0;
-    REG_AHB0_ICU_INT_ENABLE |= (0x01 << 8);
+    uint16_t adc_cnt;
+	uint16_t g_adc_value;
+	
+    adc_cnt = 0;
+    adc_flag = 0;
+
     REG_APB7_ADC_CFG |= SET_ADC_EN+(0x01 << BIT_ADC_MODE );
+
+	REG_APB7_ADC_CFG &= ~(0x0F<<BIT_ADC_CHNL);
+	REG_APB7_ADC_CFG |= (chanle << BIT_ADC_CHNL);
     
     while (!adc_flag)  
     {
         adc_cnt++;       
-        if(adc_cnt>300)
+        if(adc_cnt > 300)
         {
-            UART_PRINTF("g_adc_value_timeout\r\n");
+            UART_PRINTF("adc %d get value timeout\r\n", chanle);
             break;			
         }
-        Delay(10);
-    } 
-    if(adc_flag==1)
-    {
-        g_adc_value=(REG_APB7_ADC_DAT>>2)&0x00ff;
-        UART_PRINTF("g_adc_value=%x\r\n",g_adc_value);
-        
+        Delay_us(10);
     }
-
-    REG_APB7_ADC_CFG &= ~(SET_ADC_EN+(0x03 << BIT_ADC_MODE )); //ADC值读取完成后必须把使能位清除       
+	
+    if(adc_flag == 1)
+    {
+        g_adc_value = (REG_APB7_ADC_DAT);
+        UART_PRINTF("g_adc_value=%d\r\n",g_adc_value);
+    }
+    
+    REG_APB7_ADC_CFG &= ~(SET_ADC_EN+(0x03 << BIT_ADC_MODE )); 
     return g_adc_value;     
 }
 

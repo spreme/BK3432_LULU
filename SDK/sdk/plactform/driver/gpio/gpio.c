@@ -29,7 +29,8 @@
 #include "app_task.h"
 #include "uart.h"
 #include "user_config.h"
-
+#include "ke_timer.h"
+#include "adc.h"
 
 volatile unsigned long * GPIO_CFG[] = 
 {
@@ -150,22 +151,194 @@ void gpio_debug_msg_init()
 }
 #endif
 
+#define INT_HIGH_EDGE	1
+#define INT_LOW_EDGE	0
+
+static void jk_gpio_int_config(uint8_t gpio, uint8_t trigger)
+{
+	if(trigger == INT_HIGH_EDGE)
+		REG_APB5_GPIO_WUATOD_TYPE |= 0<<(8*(gpio>>4)+(gpio&0x0f)); //0<<2 = 0	//上升沿触发
+	else                              
+		REG_APB5_GPIO_WUATOD_TYPE |= 1<<(8*(gpio>>4)+(gpio&0x0f)); //1<<2 = 4	//下降沿触发
+	
+	REG_APB5_GPIO_WUATOD_STAT |= 1<<(8*(gpio>>4)+(gpio&0x0f));
+	Delay_ms(2);
+	REG_APB5_GPIO_WUATOD_ENABLE |= 1<<(8*(gpio>>4)+(gpio&0x0f));
+	REG_AHB0_ICU_DEEP_SLEEP0 |= 1<<(8*(gpio>>4)+(gpio&0x0f));
+}
+
+static void jk_gpio_int_en(void)
+{
+	REG_AHB0_ICU_INT_ENABLE |= (0x01 << 9);
+}
+
+
+static uint32_t suble_gpio_irq_pin_change_format(uint32_t pin)
+{
+    uint32_t zero_count = 0;
+    for(int idx=0; idx<32; idx++) {
+        pin = pin>>1;
+        if(pin == 0) {
+            break;
+        }
+        zero_count++;
+    }
+    return (((zero_count/8)*0x10) + (zero_count%8));
+}
+static void gpio_irq_handler(uint32_t pin)
+{
+	UART_PRINTF("key pin:%d \r\n",pin);
+
+	pin = suble_gpio_irq_pin_change_format(pin);
+
+	static int dis_a = 0;
+	static int dis_b = 0;
+	
+    switch(pin)
+	{
+        case RECORD_KEY:
+		UART_PRINTF("RECORD_KEY \r\n");
+//		ht1621_clean();					//清屏
+		ke_timer_set(REC_KEY_TASK, TASK_APP, 10);
+		break;
+
+        case FEED_KEY:
+		UART_PRINTF("FEED_KEY \r\n");
+		if(dis_b == 0)
+			dis_b = 10;
+		dis_b--;
+//		ht1621_disp(dis_a,dis_b);
+		ht1621_disp_dat(dis_a,dis_b+0x30);
+//		ke_timer_set(REC_KEY_TASK, TASK_APP, 10);
+		break;
+
+        case SET_KEY:
+		UART_PRINTF("SET_KEY \r\n");
+		dis_b++;
+		if(dis_b > 9)
+			dis_b = 0;
+//		ht1621_disp(dis_a,dis_b);
+		ht1621_disp_dat(dis_a,dis_b+0x30);
+		break;
+
+        case DOWM_KEY:
+		UART_PRINTF("DOWM_KEY \r\n");
+		if(dis_a == 0)
+			dis_a = 10;
+		dis_a--;
+//		ht1621_disp(dis_a,dis_b);
+		ht1621_disp_dat(dis_a,dis_b+0x30);
+		break;
+
+        case UP_KEY:
+		UART_PRINTF("UP_KEY \r\n");
+		dis_a++;
+		if(dis_a > 9)
+			dis_a = 0;
+//		ht1621_disp(dis_a,dis_b);
+		ht1621_disp_dat(dis_a,dis_b+0x30);
+		break;
+
+        case LOCK_KEY:
+		{
+			UART_PRINTF("LOCK_KEY \r\n");
+			adc_get_flag = 1;
+			beep_test();
+		}
+		break;
+		
+        default:
+			break;
+	}
+	UART_PRINTF("dis_a:%d dis_b:%d\r\n",dis_a,dis_b);
+
+#if defined KEY_DOWM_HIGHT
+	jk_gpio_int_config(RECORD_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(FEED_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(SET_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(DOWM_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(UP_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(LOCK_KEY, INT_HIGH_EDGE);	
+#else
+	jk_gpio_int_config(RECORD_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(FEED_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(SET_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(DOWM_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(UP_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(LOCK_KEY, INT_LOW_EDGE);
+#endif
+	
+	jk_gpio_int_en();
+
+}
+
 void gpio_init(void)
 {
-#if DEBUG_HW
-    *(GPIO_CFG[2]) = 0XFF0000;
-    *(GPIO_DATA[2]) = 0;
-#endif
-    //*(GPIO_CFG[0]) = 0X0000ff;		    	
-    //*(GPIO_DATA[0]) = 0;
+	//output
+	gpio_config(MOTOR_PIN_P, OUTPUT, PULL_NONE);
+	gpio_config(SOUND_PLAY, OUTPUT, PULL_NONE);
+	gpio_config(SOUND_REC, OUTPUT, PULL_NONE);
+	
+	gpio_config(HT1621_DAT, OUTPUT, PULL_NONE);
+	gpio_config(HT1621_WR, OUTPUT, PULL_NONE);
+	gpio_config(HT1621_CS, OUTPUT, PULL_NONE);
+	gpio_config(BL_EN, OUTPUT, PULL_NONE);
+	gpio_set(HT1621_DAT, 1);
+	gpio_set(HT1621_WR, 1);
+	gpio_set(HT1621_CS, 1);
+	gpio_set(BL_EN, 0);
 
-#if GPIO_DBG_MSG
-    gpio_debug_msg_init();
-    gpio_config(0x35, OUTPUT, PULL_NONE);
-    gpio_set(0x35, 0);
-    gpio_config(0x31, OUTPUT, PULL_NONE);
-    gpio_set(0x31, 0);
+	gpio_set(MOTOR_PIN_P, 0);
+	gpio_set(SOUND_PLAY, 0);
+	gpio_set(SOUND_REC, 0);
+
+	//input
+	gpio_config(MOTOR_DET, INPUT, PULL_HIGH);
+	gpio_config(CHARGE_DET, INPUT, PULL_NONE);
+
+	#ifdef MOTOR_REVERSE
+	gpio_config(MOTOR_PIN_N, OUTPUT, PULL_NONE);
+	gpio_set(MOTOR_PIN_N, 0);
+	#endif
+
+	gpio_config(BUZZER_EN, OUTPUT, PULL_NONE);
+	
+	//interrupt
+#if defined KEY_DOWM_HIGHT
+	gpio_config(RECORD_KEY, INPUT, PULL_LOW);
+	gpio_config(FEED_KEY, INPUT, PULL_LOW);
+	gpio_config(SET_KEY, INPUT, PULL_LOW);
+	gpio_config(DOWM_KEY, INPUT, PULL_LOW);
+	gpio_config(UP_KEY, INPUT, PULL_LOW);
+	gpio_config(LOCK_KEY, INPUT, PULL_LOW);
+
+	jk_gpio_int_config(RECORD_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(FEED_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(SET_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(DOWM_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(UP_KEY, INT_HIGH_EDGE);
+	jk_gpio_int_config(LOCK_KEY, INT_HIGH_EDGE);
+
+#else
+	gpio_config(RECORD_KEY, INPUT, PULL_HIGH);
+	gpio_config(FEED_KEY, INPUT, PULL_HIGH);
+	gpio_config(SET_KEY, INPUT, PULL_HIGH);
+	gpio_config(DOWM_KEY, INPUT, PULL_HIGH);
+	gpio_config(UP_KEY, INPUT, PULL_HIGH);
+	gpio_config(LOCK_KEY, INPUT, PULL_HIGH);
+
+	jk_gpio_int_config(RECORD_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(FEED_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(SET_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(DOWM_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(UP_KEY, INT_LOW_EDGE);
+	jk_gpio_int_config(LOCK_KEY, INT_LOW_EDGE);
 #endif
+	
+	jk_gpio_int_en();
+	
+	gpio_cb_register(gpio_irq_handler);
+	
 }
 
 
@@ -187,17 +360,17 @@ void gpio_cb_register(GPIO_INT_CALLBACK_T cb)
 void gpio_isr(void)
 {
 	REG_APB5_GPIO_WUATOD_ENABLE = 0x00000000; 
-	REG_APB5_GPIO_WUATOD_STAT = 0xffffffff;
     REG_AHB0_ICU_INT_ENABLE &= (~(0x01 << 9));
     //gpio_triger(0x14);
     UART_PRINTF("1\r\n");
 
-
 	//triger int callback
 	if(gpio_int_cb)
 	{
-		(*gpio_int_cb)();
+		UART_PRINTF("pin111:%X\r\n",REG_APB5_GPIO_WUATOD_STAT);
+		(*gpio_int_cb)(REG_APB5_GPIO_WUATOD_STAT);
 	}
+	REG_APB5_GPIO_WUATOD_STAT = 0xffffffff;
 }
 
 void gpio_test_init(void)

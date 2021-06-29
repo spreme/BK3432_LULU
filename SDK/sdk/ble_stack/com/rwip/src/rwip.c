@@ -760,13 +760,22 @@ uint8_t rwip_sleep(void)
          **************                 CHECK UART                   **************
          ************************************************************************/
         // Try to switch off TL
-        if (!check_uart_stop())
+		if (!check_uart_stop())
         {
             proc_sleep = false;
             break; 
         }
         #endif 
+		
+		#if (UART2_DRIVER)
+		if (!check_uart2_stop())
+        {
+            proc_sleep = false;
+            break; 
+        }
 
+		#endif
+		
         DBG_SWDIAG(SLEEP, ALGO, 6);
 
         /************************************************************************

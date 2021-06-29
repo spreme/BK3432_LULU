@@ -43,7 +43,8 @@
 #include "reg_ble_em_cs.h"
 #include "lld.h"
 #include "wdt.h"
-
+#include "utc_clock.h"
+#include "tuya_ble_unix_time.h"
 
 /*
  * LOCAL FUNCTION DEFINITIONS
@@ -179,7 +180,7 @@ static int gapm_cmp_evt_handler(ke_msg_id_t const msgid,
                 // Go to the ready state
                 ke_state_set(TASK_APP, APPM_READY);
 							
-				appm_start_advertising();
+//				appm_start_advertising();
             }
         }
         break;
@@ -207,7 +208,7 @@ static int gapm_cmp_evt_handler(ke_msg_id_t const msgid,
                 ke_state_set(TASK_APP, APPM_READY);
 				
 				//device not bonded, start general adv
-				appm_start_advertising();
+//				appm_start_advertising();
             }
 		}
         break;
@@ -366,7 +367,7 @@ static int gapc_connection_req_ind_handler(ke_msg_id_t const msgid,
     else
     {
         // No connection has been establish, restart advertising
-		appm_start_advertising();
+//		appm_start_advertising();
     }
 
     return (KE_MSG_CONSUMED);
@@ -474,7 +475,7 @@ static int gapc_disconnect_ind_handler(ke_msg_id_t const msgid,
 	wdt_disable_flag = 1;
 
 	// Restart Advertising
-	appm_start_advertising();
+//	appm_start_advertising();
 
 	
     return (KE_MSG_CONSUMED);
@@ -771,6 +772,78 @@ static int gattc_mtu_exchange_req_handler(ke_msg_id_t const msgid,
  * GLOBAL VARIABLES DEFINITION
  ****************************************************************************************
  */
+uint32_t rec_key_tick = 0;
+
+void rec_key_callback(void)
+{
+	if(gpio_get_input(RECORD_KEY))
+	{
+		if(rec_key_tick <= 10)
+		{
+			UART_PRINTF("play sound !!\r\n");
+
+			gpio_set(SOUND_PLAY, 1);
+			Delay_ms(100);
+			gpio_set(SOUND_PLAY, 0);
+		}
+		else
+		{
+			gpio_set(SOUND_REC, 0);
+			UART_PRINTF("rec over !!\r\n");
+		}
+		rec_key_tick = 0;
+	}
+	else
+	{
+		rec_key_tick++;
+		
+		if(rec_key_tick > 10)
+			gpio_set(SOUND_REC, 1);
+		
+		if(rec_key_tick >= 100)
+		{
+			rec_key_tick = 0;
+			gpio_set(SOUND_REC, 0);
+			UART_PRINTF("rec over !!\r\n");
+		}
+		else
+			ke_timer_set(REC_KEY_TASK, TASK_APP, 10);
+	}
+}
+
+void utc_callback(void)
+{
+	tuya_ble_time_struct_data_t t_struct;
+	uint32_t t_now = 0;
+	
+	memset(&t_struct, 0, sizeof(tuya_ble_time_struct_data_t));
+		
+	utc_update();
+	t_now = utc_get_clock();
+	tuya_ble_utc_sec_2_mytime(t_now, &t_struct, 0);
+
+	UART_PRINTF("%04d-%02d-%02d %02d:%02d:%02d weekday:%02d\r\n",
+				t_struct.nYear, t_struct.nMonth, t_struct.nDay,
+				t_struct.nHour, t_struct.nMin, t_struct.nSec, t_struct.DayIndex);
+	
+	ke_timer_set(UTC_TASK, TASK_APP, 500);
+}
+
+static int app_utc_handler(ke_msg_id_t const msgid,
+        ke_task_id_t const dest_id,
+        ke_task_id_t const src_id)
+{
+	utc_callback();	
+	return (KE_MSG_CONSUMED);
+}
+
+static int app_get_rec_handler(ke_msg_id_t const msgid,
+        ke_task_id_t const dest_id,
+        ke_task_id_t const src_id)
+{
+	rec_key_callback();	
+	return (KE_MSG_CONSUMED);
+}
 
 /* Default State handlers definition. */
 const struct ke_msg_handler appm_default_state[] =
@@ -792,6 +865,8 @@ const struct ke_msg_handler appm_default_state[] =
     {APP_PARAM_UPDATE_REQ_IND, 		(ke_msg_func_t)gapc_update_conn_param_req_ind_handler},
     {APP_PERIOD_TIMER,				(ke_msg_func_t)app_period_timer_handler},
     {APP_GATTC_EXC_MTU_CMD,		    (ke_msg_func_t)gattc_mtu_exchange_req_handler},
+	{REC_KEY_TASK,		    		(ke_msg_func_t)app_get_rec_handler},
+	{UTC_TASK,		    			(ke_msg_func_t)app_utc_handler},
 };
 
 /* Specifies the message handlers that are common to all states. */

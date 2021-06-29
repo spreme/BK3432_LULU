@@ -92,6 +92,12 @@ void pwm_init(PWM_DRV_DESC *pwm_drv_desc)
 	}
 }
 
+void pwm_set_duty(PWM_DRV_DESC *pwm_drv_desc)
+{
+	REG_PWM_X_CNT(pwm_drv_desc->channel) =
+        ((((unsigned long)pwm_drv_desc->duty_cycle << PWM_CNT_DUTY_CYCLE_POSI) & PWM_CNT_DUTY_CYCLE_MASK)
+       + (((unsigned long)pwm_drv_desc->end_value << PWM_CNT_END_VALUE_POSI) & PWM_CNT_END_VALUE_MASK));
+}
 
 void pwm_enable(unsigned char ucChannel)
 {

@@ -21,8 +21,8 @@
 
 
 static void utc_clock_update( UTCTime elapsedMSec );
-static void utc_set_clock( uint32_t newTime );
-static uint32_t utc_get_clock( void );
+//static void utc_set_clock( uint32_t newTime );
+//static uint32_t utc_get_clock( void );
 static void utc_convert_utc_time(UTCTimeStruct *tm, uint32_t secTime );
 static uint8_t monthLength( uint8_t lpyr, uint8_t mon );
 static uint32_t utc_convert_utc_secs( UTCTimeStruct *tm );
@@ -89,13 +89,13 @@ void utc_get_time(UTCTimeStruct *tm)
 }
 
 
-static void utc_set_clock( UTCTime newTime )
+void utc_set_clock( UTCTime newTime )
 {
 	rtc_timeSeconds = newTime;
 }
 
 
-static uint32_t utc_get_clock( void )
+uint32_t utc_get_clock( void )
 {
 	return ( rtc_timeSeconds );
 }

@@ -58,8 +58,9 @@
 #include "wdt.h"
 #include "user_config.h"
 #include "app_fcc0.h"
-
-
+#include "utc_clock.h"
+#include "tuya_ble_unix_time.h"
+#include "ke_timer.h"
 /**
  ****************************************************************************************
  * @addtogroup DRIVERS
@@ -69,6 +70,7 @@
  * ****************************************************************************************
  */
 
+FEED_PLAN_t feed_plan;
 
 /*
  * GLOBAL VARIABLE DEFINITIONS
@@ -77,7 +79,7 @@
 
 // Creation of uart external interface api
 struct rwip_eif_api uart_api;
-
+uint8_t adc_get_flag = 0;
 /*
  * LOCAL FUNCTION DECLARATIONS
  ****************************************************************************************
@@ -90,30 +92,32 @@ extern void code_sanity_check(void);
 #if (UART_DRIVER)
 void uart_rx_handler(uint8_t *buf, uint8_t len);
 #endif
+#if (UART2_DRIVER)
+void uart2_rx_handler(uint8_t *buf, uint8_t len);
+#endif
 
-#if ((UART_PRINTF_EN) &&(UART_DRIVER))
+#if ((UART_PRINTF_EN) &&(UART_DRIVER || UART2_DRIVER))
 void assert_err(const char *condition, const char * file, int line)
 {
-	uart_printf("%s,condition %s,file %s,line = %d\r\n",__func__,condition,file,line);
+	UART_PRINTF("%s,condition %s,file %s,line = %d\r\n",__func__,condition,file,line);
 
 }
 
 void assert_param(int param0, int param1, const char * file, int line)
 {
-	uart_printf("%s,param0 = %d,param1 = %d,file = %s,line = %d\r\n",__func__,param0,param1,file,line);
+	UART_PRINTF("%s,param0 = %d,param1 = %d,file = %s,line = %d\r\n",__func__,param0,param1,file,line);
 
 }
 
 void assert_warn(int param0, int param1, const char * file, int line)
 {
-	uart_printf("%s,param0 = %d,param1 = %d,file = %s,line = %d\r\n",__func__,param0,param1,file,line);
+	UART_PRINTF("%s,param0 = %d,param1 = %d,file = %s,line = %d\r\n",__func__,param0,param1,file,line);
 
 }
 
 void dump_data(uint8_t* data, uint16_t length)
 {
-	uart_printf("%s,data = %d,length = %d,file = %s,line = %d\r\n",__func__,data,length);
-
+	UART_PRINTF("%s,data = %d,length = %d,file = %s,line = %d\r\n",__func__,data,length);
 }
 #else
 void assert_err(const char *condition, const char * file, int line)
@@ -155,7 +159,12 @@ void platform_reset(uint32_t error)
 
 #if UART_PRINTF_EN
 	// Wait UART transfer finished
+	#ifdef UART_1_PRINTF
 	uart_finish_transfers();
+	#endif
+	#ifdef UART_2_PRINTF
+	uart2_finish_transfers();
+	#endif
 #endif //UART_PRINTF_EN
 
 
@@ -202,17 +211,43 @@ void ble_clk_enable(void)
  * @return status   exit status
  *******************************************************************************
  */
+void user_rtc_isr()
+{
+
+}
+
+PWM_DRV_DESC timer_desc_2;
+
+void beep_test(void)
+{
+	timer_desc_2.duty_cycle = 3;
+	pwm_set_duty(&timer_desc_2);
+	Delay_ms(100);
+	timer_desc_2.duty_cycle = 0;
+	pwm_set_duty(&timer_desc_2);
+}
+
+void beep_init(void)
+{	
+	timer_desc_2.channel = 2;
+	timer_desc_2.mode = 1<<0 | 0<<1 | 0<<2 | 0<<4;
+	timer_desc_2.end_value = 6;
+	timer_desc_2.duty_cycle = 0;
+	pwm_init(&timer_desc_2);
+}
 
 extern struct rom_env_tag rom_env;
 
 void rwip_eif_api_init(void);
 void rw_main(void)
 {
+	uint8_t utc_flag = 0;
 	/*
 	 ***************************************************************************
 	 * Platform initialization
 	 ***************************************************************************
 	 */
+	
 #if SYSTEM_SLEEP
 	uint8_t sleep_type = 0;
 #endif
@@ -238,6 +273,10 @@ void rw_main(void)
 #if (UART_DRIVER)
 	uart_init(115200);
 	uart_cb_register(uart_rx_handler);
+#endif
+#if (UART2_DRIVER)
+	uart2_init(115200);
+	uart2_cb_register(uart2_rx_handler);
 #endif
 
 #if PLF_NVDS
@@ -266,15 +305,28 @@ void rw_main(void)
 	bdaddr_env_init();
 
 	gpio_init();
+	adc_init(0);
 
 	REG_AHB0_ICU_INT_ENABLE |= (0x01 << 15); //BLE INT
 	REG_AHB0_ICU_IRQ_ENABLE = 0x03;
 
+	rwip_prevent_sleep_set(BK_DRIVER_TIMER_ACTIVE);	//关闭低功耗
 	// finally start interrupt handling
 	GLOBAL_INT_START();
 
 	UART_PRINTF("start \r\n");
 
+//	RTC_DATE_DESC RTC_date;
+//	memset(&RTC_date, 0, sizeof(RTC_date));
+//	rtc_alarm_init(1, &RTC_date, 1000, user_rtc_isr);				//时钟中断  1s中断一次
+	ht1621_init();
+	ht1621_clean();					//清屏
+	beep_init();
+	beep_test();
+	
+	utc_update();
+	utc_set_clock((1624021500 + 28800));
+	
 	/*
 	 ***************************************************************************
 	 * Main loop
@@ -285,6 +337,18 @@ void rw_main(void)
 		//schedule all pending events
 		rwip_schedule();
 
+		if(utc_flag == 0)
+		{
+			utc_flag = 1;
+			ke_timer_set(UTC_TASK, TASK_APP, 500);
+		}
+		
+		if(adc_get_flag == 1)
+		{
+			adc_get_flag = 0;
+			adc_get_value(1);
+		}
+		
 		// Checks for sleep have to be done with interrupt disabled
 		GLOBAL_INT_DISABLE();
 
@@ -327,16 +391,37 @@ static void uart_rx_handler(uint8_t *buf, uint8_t len)
 	{
 		UART_PRINTF("0x%x ", buf[i]);
 	}
-	uart_printf("\r\n");
+	UART_PRINTF("\r\n");
+}
+#endif
+#if (UART2_DRIVER)
+static void uart2_rx_handler(uint8_t *buf, uint8_t len)
+{
+	for(uint8_t i=0; i<len; i++)
+	{
+		UART_PRINTF("0x%x ", buf[i]);
+	}
+	UART_PRINTF("\r\n");
 }
 #endif
 
+
+
 void rwip_eif_api_init(void)
 {
+	#ifdef UART_1_INIT
 	uart_api.read = &uart_read;
 	uart_api.write = &uart_write;
 	uart_api.flow_on = &uart_flow_on;
 	uart_api.flow_off = &uart_flow_off;
+	#endif
+	
+	#ifdef UART_2_INIT
+	uart_api.read = &uart2_read;
+	uart_api.write = &uart2_write;
+	uart_api.flow_on = &uart2_flow_on;
+	uart_api.flow_off = &uart2_flow_off;	
+	#endif
 }
 
 const struct rwip_eif_api* rwip_eif_get(uint8_t type)
@@ -377,7 +462,7 @@ static void Stack_Integrity_Check(void)
 	{
 		while(1)
 		{
-			uart_putchar("Stack_Integrity_Check STACK_BASE_UNUSED fail!\r\n");
+			UART_PUTCHAR("Stack_Integrity_Check STACK_BASE_UNUSED fail!\r\n");
 		}
 	}
 
@@ -385,7 +470,7 @@ static void Stack_Integrity_Check(void)
 	{
 		while(1)
 		{
-			uart_putchar("Stack_Integrity_Check STACK_BASE_SVC fail!\r\n");
+			UART_PUTCHAR("Stack_Integrity_Check STACK_BASE_SVC fail!\r\n");
 		}
 	}
 
@@ -393,7 +478,7 @@ static void Stack_Integrity_Check(void)
 	{
 		while(1)
 		{
-			uart_putchar("Stack_Integrity_Check STACK_BASE_FIQ fail!\r\n");
+			UART_PUTCHAR("Stack_Integrity_Check STACK_BASE_FIQ fail!\r\n");
 		}
 	}
 
@@ -401,7 +486,7 @@ static void Stack_Integrity_Check(void)
 	{
 		while(1)
 		{
-			uart_putchar("Stack_Integrity_Check STACK_BASE_IRQ fail!\r\n");
+			UART_PUTCHAR("Stack_Integrity_Check STACK_BASE_IRQ fail!\r\n");
 		}
 	}
 
@@ -429,8 +514,14 @@ void rom_env_init(struct rom_env_tag *api)
 	rom_env.platform_reset = platform_reset;
 	rom_env.assert_err = assert_err;
 	rom_env.assert_param = assert_param;
+	#ifdef UART_1_INIT
 	rom_env.Read_Uart_Buf = Read_Uart_Buf;
 	rom_env.uart_clear_rxfifo = uart_clear_rxfifo;
+	#endif
+	#ifdef UART_2_INIT
+	rom_env.Read_Uart2_Buf = Read_Uart2_Buf;
+	rom_env.uart2_clear_rxfifo = uart2_clear_rxfifo;
+	#endif
 
 }
 

@@ -83,6 +83,10 @@ enum appm_msg
 	
 	APP_PERIOD_TIMER,	
 	APP_GATTC_EXC_MTU_CMD,
+	
+	REC_KEY_TASK,
+	
+	UTC_TASK,
 };
 
 

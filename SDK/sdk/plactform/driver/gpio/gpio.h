@@ -116,7 +116,8 @@ void gpio_wakeup(void);
 
 void gpio_triger(uint8_t gpio);
 
-typedef void (*GPIO_INT_CALLBACK_T)(void);   
+//typedef void (*GPIO_INT_CALLBACK_T)(void);   
+typedef void (*GPIO_INT_CALLBACK_T)(uint32_t pin);   
 
 void gpio_cb_register(GPIO_INT_CALLBACK_T cb);
  

@@ -19,6 +19,7 @@
 extern "C" {
 #endif  /* __cplusplus */
 
+#include "stdint.h"
 #define UTC_ENABLE			0
 
 // number of seconds since 0 hrs, 0 minutes, 0 seconds, on the
@@ -41,6 +42,8 @@ typedef struct
 void utc_update( void );
 void utc_set_time(UTCTimeStruct *tm);
 void utc_get_time(UTCTimeStruct *tm);
+void utc_set_clock( UTCTime newTime );
+uint32_t utc_get_clock( void );
 
 #ifdef __cplusplus
 }
