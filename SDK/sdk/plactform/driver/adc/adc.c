@@ -82,7 +82,7 @@ uint16_t adc_get_value(uint8_t chanle)
     if(adc_flag == 1)
     {
         g_adc_value = (REG_APB7_ADC_DAT);
-        UART_PRINTF("g_adc_value=%d\r\n",g_adc_value);
+//        UART_PRINTF("g_adc_value=%d\r\n",g_adc_value);
     }
     
     REG_APB7_ADC_CFG &= ~(SET_ADC_EN+(0x03 << BIT_ADC_MODE )); 

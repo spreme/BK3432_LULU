@@ -23,9 +23,26 @@
  //#######################################################################################//
 //#################################### 型号定义 ##########################################//
 //#######################################################################################//
-#define LNH_01					1		//廖工-前海一凡按键板
+//#define LNH_01					1		//廖工-前海一凡按键板
+#define PT01K_BK				1		//小派按键带屏版
 
 #if defined LNH_01
+//	#define RTC_TIME			1		//外部时钟计时
+	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
+	#define FEED_ONE_DELAY 		100		//喂食一份后延时停止电机时间
+	#define LOCK_KEY_E			1		//锁键按键
+	#define FEED_KEY_E			1		//喂食按键
+
+	#define MOTOR_REVERSE		1		//电机反转功能
+	#define UART_2_INIT			1		//串口2初始化
+	#define UART_2_PRINTF		1		//串口2打印
+//	#define UART_1_INIT			1		//串口1初始化
+//	#define UART_1_PRINTF		1		//串口1打印
+
+	#define MOTOR_DELAY			Delay_ms(1000)			//喂食结束延时停止电机时间
+#endif
+
+#if defined PT01K_BK
 //	#define RTC_TIME			1		//外部时钟计时
 	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
 	#define FEED_ONE_DELAY 		100		//喂食一份后延时停止电机时间
@@ -37,8 +54,27 @@
 //	#define UART_1_PRINTF		1		//串口1打印
 
 	#define MOTOR_DELAY			Delay_ms(1000)			//喂食结束延时停止电机时间
-
 #endif
+
+//******************************* 可用宏定义 ***********************************************//
+#if 0
+	#define RTC_TIME			1		//外部时钟计时
+	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
+	#define LOCK_KEY_E			1		//锁键按键
+	#define FEED_KEY_E			1		//喂食按键
+	#define MOTOR_REVERSE		1		//电机反转功能
+	#define BACKLIGHT_CONTROL	1		//背光灯控制亮度
+	
+	#define UART_2_INIT			1		//串口2初始化
+	#define UART_2_PRINTF		1		//串口2打印
+	#define UART_1_INIT			1		//串口1初始化
+	#define UART_1_PRINTF		1		//串口1打印
+
+	#define FEED_ONE_DELAY 		100		//喂食一份后延时停止电机时间
+	#define MOTOR_DELAY			Delay_ms(1000)			//喂食结束延时停止电机时间
+#endif
+//******************************* 可用宏定义 ***********************************************//
+
 
  /******************************************************************************
   *############################################################################*
@@ -106,6 +142,14 @@ enum FEED_STATUS_TYPE {
 };
 
 typedef struct {
+	uint8_t mark;
+	uint32_t rtc_timestamp;				//时间戳
+	uint32_t record_time;				//录音时长
+	uint8_t led_backlight_pwm;			//背光灯亮度		
+} SAVE_INFO_t;
+
+
+typedef struct {
 	uint8_t hour;
 	uint8_t minute;
 	uint8_t weight;
@@ -117,6 +161,19 @@ typedef struct {
 } FEED_PLAN_t;
 
 extern FEED_PLAN_t feed_plan;
+extern SAVE_INFO_t save_info;
+
+extern uint8_t lock_flag;				//设备锁标志
+extern uint8_t key_scan_flag;			//正在检查按键标志
+extern uint8_t key_flag;				//按键触发类型
+extern uint8_t reset_flag;				//复位标志
+extern uint8_t key_lock;				//锁按键标志
+
+extern uint32_t lock_timeout;			//锁屏超时时间
+
+//void ht1621_set_dat(uint8_t addr, uint8_t val);
+void beep_test(void);
+extern uint8_t feed_status;
 
 /*******************************************************************************
  *#############################################################################*
@@ -150,25 +207,12 @@ extern FEED_PLAN_t feed_plan;
 #include "rf.h"
 #include "uart2.h"
 #include "uart.h"
+#include "flash.h"
+#include "motor.h"
 
 #include "lcd.h"
 #include "function.h"
 #include "user_gpio.h"
 
-//#################################### 灯状态  ##########################################//
-#ifdef LED_ON_HIGHT
-	#define SET_LED_ON(led_pin) 		gpio_set(led_pin, 1)
-	#define SET_LED_OFF(led_pin) 		gpio_set(led_pin, 0)
-#else
-	#define SET_LED_ON(led_pin) 		gpio_set(led_pin, 0)
-	#define SET_LED_OFF(led_pin) 		gpio_set(led_pin, 1)
-#endif
-
-extern uint8_t adc_get_flag;
-extern uint8_t feed_status;
-extern FEED_PLAN_t f_plan;
-
-void ht1621_set_dat(uint8_t addr, uint8_t val);
-void beep_test(void);
 
 #endif /* _USER_CONFIG_H_ */

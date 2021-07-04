@@ -71,7 +71,7 @@
  */
 
 FEED_PLAN_t feed_plan;
-
+SAVE_INFO_t save_info;
 /*
  * GLOBAL VARIABLE DEFINITIONS
  ****************************************************************************************
@@ -79,7 +79,6 @@ FEED_PLAN_t feed_plan;
 
 // Creation of uart external interface api
 struct rwip_eif_api uart_api;
-uint8_t adc_get_flag = 0;
 /*
  * LOCAL FUNCTION DECLARATIONS
  ****************************************************************************************
@@ -236,12 +235,51 @@ void beep_init(void)
 	pwm_init(&timer_desc_2);
 }
 
+void flash_data_init()
+{
+	#if defined NO_RECORD_FUNC || defined KEY_BUZZER_FUNC
+	pwm_buzzer_en(6);
+	Delay_ms(100);
+	pwm_buzzer_en(0);
+	Delay_ms(200);
+	pwm_buzzer_en(6);
+	Delay_ms(100);
+	pwm_buzzer_en(0);
+	Delay_ms(50);
+	pwm_buzzer_en(6);
+	Delay_ms(100);
+	pwm_buzzer_en(0);
+	#else
+	gpio_set(SOUND_REC, 1);
+	Delay_ms(300);
+	gpio_set(SOUND_REC, 0);
+	#endif
+
+	memset(&feed_plan, 0, sizeof(FEED_PLAN_t));
+	feed_plan.mark = FLASH_KEEP_VAL;
+	flash_erase(0,BLE_PLAN_ADDR,0x1000);
+	flash_write(0, BLE_PLAN_ADDR, sizeof(FEED_INFO_t), (uint8_t *)&feed_plan);
+
+	memset(&save_info, 0, sizeof(SAVE_INFO_t));
+	save_info.mark = FLASH_KEEP_VAL;
+	flash_erase(0,BLE_SAVE_ADDR,0x1000);
+	flash_write(0, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
+	
+	
+	Delay_ms(500);
+	wdt_enable(10);
+	while(1);
+
+}
+
+
 extern struct rom_env_tag rom_env;
 
 void rwip_eif_api_init(void);
 void rw_main(void)
 {
 	uint8_t utc_flag = 0;
+	
 	/*
 	 ***************************************************************************
 	 * Platform initialization
@@ -253,21 +291,21 @@ void rw_main(void)
 #endif
 	icu_init();
 
-	// Initialize random process
+	// Initialize random process	初始化随机过程
 	srand(1);
 
-	//get System sleep flag
+	//get System sleep flag	获取系统睡眠标志
 	system_sleep_init();
 
-	// Initialize the exchange memory interface
+	// Initialize the exchange memory interface	初始化exchange内存接口
 	emi_init();
 
-	// Initialize timer module
+	// Initialize timer module	初始化定时器模块
 	timer_init();
 
 	rwip_eif_api_init();
 
-	// Initialize the Interrupt Controller
+	// Initialize the Interrupt Controller	初始化中断控制器
 	intc_init();
 	// Initialize UART component
 #if (UART_DRIVER)
@@ -322,11 +360,19 @@ void rw_main(void)
 	ht1621_init();
 	ht1621_clean();					//清屏
 	beep_init();
-	beep_test();
+	#ifdef BACKLIGHT_CONTROL
+	backlight_init();
+	#endif
 	
 	utc_update();
 	utc_set_clock((1624021500 + 28800));
 	
+	get_time();
+	disp_voltage();					//显示电量
+	
+	ht1621_disp(LOCK, 1);			//显示锁
+	ht1621_disp(LOCK_CLOSE, 1);		//显示锁关闭
+
 	/*
 	 ***************************************************************************
 	 * Main loop
@@ -336,21 +382,73 @@ void rw_main(void)
 	{
 		//schedule all pending events
 		rwip_schedule();
-
+		wdt_enable(0xffff);
+		
 		if(utc_flag == 0)
 		{
 			utc_flag = 1;
-			ke_timer_set(UTC_TASK, TASK_APP, 500);
+			ke_timer_set(UTC_TASK, TASK_APP, 100);
+		}
+
+		if(feed_one_flag)
+		{
+			UART_PRINTF("feed_one_flag\n");
+
+			feed_info_func.hour = 0;
+			feed_info_func.minute = 0;
+			feed_info_func.weight = 1;//改
+			feed_error = feed_run(&feed_info_func);
+			
+			feed_one_flag = 0;
+		}
+				
+		//按键复位	
+		if(reset_flag == 1)						//按键按下没松开
+		{
+			UART_PRINTF(" reset the mcu!\r\n");
+			flash_data_init(); 				//清空单片机,恢复出厂
+			
+			record_reset_control();
+			wdt_enable(10);
 		}
 		
-		if(adc_get_flag == 1)
+		if(check_feed_flag)						//喂食检测：一分钟置1一次
 		{
-			adc_get_flag = 0;
-			adc_get_value(1);
+			feed_scan(&feed_info_func);					//扫描eeprom判断是否需要执行定时喂食
+			check_feed_flag = 0;
 		}
+		else if(feed_detect_again)					//再次喂食检测
+		{
+			if((feed_error & ERROR_IR) == 0)		//不是红外错误，出粮口正常
+			{
+				feed_required = FEED_OLD;			//饲料所需
+			}
+		}
+		
+		if(feed_required > 0)
+		{
+			feed_error = feed_run(&feed_info_func);
+			
+			feed_required = 0;
+
+			if(feed_error & ERROR_IR)			//喂食红外错误
+			{
+				UART_PRINTF(" feed_error & ERROR_IR \r\n");
+				feed_detect_again = 1;			//红外错误：确保喂食错误，再次喂食检测
+			}
+			else
+			{
+				feed_detect_again = 0;
+			}
+		}
+		
+		key_func();
+
+		
 		
 		// Checks for sleep have to be done with interrupt disabled
-		GLOBAL_INT_DISABLE();
+		//睡眠检查必须在中断被禁用的情况下进行
+		GLOBAL_INT_DISABLE();				//全局中断暂停
 
 		oad_updating_user_section_pro();
 
@@ -378,8 +476,8 @@ void rw_main(void)
 			cpu_idle_sleep();
 		}
 #endif
-		Stack_Integrity_Check();
-		GLOBAL_INT_RESTORE();
+		Stack_Integrity_Check();				//堆栈完整性检查
+		GLOBAL_INT_RESTORE();					//全局中断复位
 	}
 }
 

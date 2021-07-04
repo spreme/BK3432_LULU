@@ -85,6 +85,7 @@ enum appm_msg
 	APP_GATTC_EXC_MTU_CMD,
 	
 	REC_KEY_TASK,
+	KEY_SCAN_TASK,
 	
 	UTC_TASK,
 };
