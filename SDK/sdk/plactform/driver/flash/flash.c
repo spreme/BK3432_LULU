@@ -64,7 +64,6 @@ void flash_init(void)
 
 	flash_env.length[1]    =  FLASH_NVR_SIZE;
 	flash_env.space_type[1]  = FLASH_SPACE_TYPE_NVR;
-
 }
 
 

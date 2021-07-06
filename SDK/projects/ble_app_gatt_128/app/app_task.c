@@ -780,18 +780,26 @@ void rec_key_callback(void)
 	{
 		if(rec_key_tick <= 10)
 		{
+			SET_LED_ON(PWR_LED);
+			SET_LED_OFF(LINK_LED);
+
 			UART_PRINTF("play sound !!\r\n");
 
 			play_record_control();
+			
+			SET_LED_OFF(PWR_LED);
+			SET_LED_ON(LINK_LED);
 		}
 		else
 		{
 			gpio_set(SOUND_REC, 0);
 			UART_PRINTF("rec over !!\r\n");
 			
-			flash_erase(0,BLE_SAVE_ADDR,0x1000);
-			flash_write(0, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
+			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 
+			SET_LED_OFF(PWR_LED);
+			SET_LED_ON(LINK_LED);
 		}
 		rec_key_tick = 0;
 	}
@@ -803,14 +811,18 @@ void rec_key_callback(void)
 		{
 			gpio_set(SOUND_REC, 1);
 			save_info.record_time++;
+			SET_LED_ON(PWR_LED);
+			SET_LED_OFF(LINK_LED);
 		}
 		if(rec_key_tick >= 110)
 		{
 			rec_key_tick = 0;
 			gpio_set(SOUND_REC, 0);
 			UART_PRINTF("rec over !!\r\n");
-			flash_erase(0,BLE_SAVE_ADDR,0x1000);
-			flash_write(0, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
+			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
+			SET_LED_OFF(PWR_LED);
+			SET_LED_ON(LINK_LED);
 		}
 		else
 		{
@@ -859,84 +871,109 @@ uint32_t lock_key_tick = 0;				//锁键按键计时
 void key_scan_callback(void)
 {
 //	UART_PRINTF("key_scan_callback\r\n");
-	if(gpio_get_input(SET_KEY))
-	{
-		if(set_key_tick <= KEY_SHORT_TIME && set_key_tick != 0)				//按键时间小于1s
-		{
-			key_flag = KEY_SET_S;
-			UART_PRINTF("key_flag = KEY_SET_S\r\n");
-		}
-		else if(up_key_tick > KEY_LONG_TIME)
-		{
-			key_flag = KEY_SET_L_UP;
-			UART_PRINTF("key_flag = KEY_SET_L_UP\r\n");
-		}
-		set_key_tick = 0;		
-	}
-	else
-	{
-		set_key_tick++;
-		if(set_key_tick > KEY_LONG_TIME)
-		{
-			key_flag = KEY_SET_L;
-			UART_PRINTF("key_flag = KEY_SET_L\r\n");
-			set_key_tick = 0;
-		}
-	}
+	static uint16_t reset_time = 0;
 	
-	if(gpio_get_input(UP_KEY))
+	if(key_scan_flag == 0)
 	{
-		if(up_key_tick <= KEY_SHORT_TIME && up_key_tick != 0)				//按键时间小于1s
+		if(gpio_get_input(SET_KEY))
 		{
-			key_flag = KEY_UP_S;
-			UART_PRINTF("key_flag = KEY_UP_S\r\n");
+			if(set_key_tick <= KEY_SHORT_TIME && set_key_tick != 0)				//按键时间小于1s
+			{
+				key_flag = KEY_SET_S;
+				UART_PRINTF("key_flag = KEY_SET_S\r\n");
+			}
+			else if(up_key_tick > KEY_LONG_TIME)
+			{
+				key_flag = KEY_SET_L_UP;
+				UART_PRINTF("key_flag = KEY_SET_L_UP\r\n");
+			}
+			set_key_tick = 0;		
 		}
-		else if(up_key_tick > KEY_LONG_TIME)
+		else
 		{
-			key_flag = KEY_UP_L_UP;
-			UART_PRINTF("key_flag = KEY_UP_L_UP\r\n");
+			set_key_tick++;
+			if(set_key_tick > KEY_LONG_TIME)
+			{
+				key_flag = KEY_SET_L;
+				UART_PRINTF("key_flag = KEY_SET_L\r\n");
+				set_key_tick = 0;
+			}
 		}
-		up_key_tick = 0;		
+		
+		if(gpio_get_input(UP_KEY))
+		{
+			if(up_key_tick <= KEY_SHORT_TIME && up_key_tick != 0)				//按键时间小于1s
+			{
+				key_flag = KEY_UP_S;
+				UART_PRINTF("key_flag = KEY_UP_S\r\n");
+			}
+			else if(up_key_tick > KEY_LONG_TIME)
+			{
+				key_flag = KEY_UP_L_UP;
+				UART_PRINTF("key_flag = KEY_UP_L_UP\r\n");
+			}
+			up_key_tick = 0;		
+		}
+		else
+		{
+			up_key_tick++;
+			if(up_key_tick > KEY_LONG_TIME)
+			{
+				key_flag = KEY_UP_L;
+				UART_PRINTF("key_flag = KEY_UP_L\r\n");
+				up_key_tick = 0;
+			}
+		}
+		
+		if(gpio_get_input(DOWN_KEY))
+		{
+			if(dowm_key_tick <= KEY_SHORT_TIME && dowm_key_tick != 0)				//按键时间小于1s
+			{
+				key_flag = KEY_DOWN_S;
+				UART_PRINTF("key_flag = KEY_DOWN_S\r\n");
+			}
+			else if(dowm_key_tick > KEY_LONG_TIME)
+			{
+				key_flag = KEY_DOWN_L_UP;
+				UART_PRINTF("key_flag = KEY_DOWN_L_UP\r\n");
+			}
+			dowm_key_tick = 0;		
+		}
+		else
+		{
+			dowm_key_tick++;
+			if(dowm_key_tick > KEY_LONG_TIME)
+			{
+				key_flag = KEY_DOWN_L;
+				UART_PRINTF("key_flag = KEY_DOWN_L\r\n");
+				dowm_key_tick = 0;
+			}
+		}
 	}
-	else
-	{
-		up_key_tick++;
-		if(up_key_tick > KEY_LONG_TIME)
-		{
-			key_flag = KEY_UP_L;
-			UART_PRINTF("key_flag = KEY_UP_L\r\n");
-			up_key_tick = 0;
-		}
-	}
-	
-	if(gpio_get_input(DOWN_KEY))
-	{
-		if(dowm_key_tick <= KEY_SHORT_TIME && dowm_key_tick != 0)				//按键时间小于1s
-		{
-			key_flag = KEY_DOWN_S;
-			UART_PRINTF("key_flag = KEY_DOWN_S\r\n");
-		}
-		else if(dowm_key_tick > KEY_LONG_TIME)
-		{
-			key_flag = KEY_DOWN_L_UP;
-			UART_PRINTF("key_flag = KEY_DOWN_L_UP\r\n");
-		}
-		dowm_key_tick = 0;		
-	}
-	else
-	{
-		dowm_key_tick++;
-		if(dowm_key_tick > KEY_LONG_TIME)
-		{
-			key_flag = KEY_DOWN_L;
-			UART_PRINTF("key_flag = KEY_DOWN_L\r\n");
-			dowm_key_tick = 0;
-		}
-	}
-	
 	if(get_key_state())
 	{
-		ke_timer_set(KEY_SCAN_TASK, TASK_APP, 1);	
+		ke_timer_set(KEY_SCAN_TASK, TASK_APP, 10);	
+	}
+	
+	if(gpio_get_input(UP_KEY) == 0 && gpio_get_input(SET_KEY) == 0)
+	{
+		if(set_time_flag == 0 && set_val_flag == 0 && lock_flag == 0)
+		{
+			feed_one_flag = 1;
+		}
+	}
+	
+	if(lock_flag)
+	{
+		if(gpio_get_input(UP_KEY) == 0)
+		{
+			reset_time++;
+			if(reset_time >= 100)
+			{
+				reset_flag = 1;
+				reset_time = 0;
+			}
+		}
 	}
 	
 	#ifdef LOCK_KEY_E
@@ -972,7 +1009,7 @@ void utc_callback(void)
 {
 	tuya_ble_time_struct_data_t t_struct;
 	uint32_t t_now = 0;
-	
+
 	memset(&t_struct, 0, sizeof(tuya_ble_time_struct_data_t));
 		
 	utc_update();
@@ -1015,8 +1052,10 @@ void utc_callback(void)
 		if(save_time > 100)
 		{
 			save_info.rtc_timestamp = t_now;
-			flash_erase(0, BLE_SAVE_ADDR, 0x1000);
-			flash_write(0, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
+			UART_PRINTF("save save_time 11\n");
+
+			flash_erase(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, FLASH_SIZE_ONE);
+			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 
 			save_time = 0;
 		}
@@ -1024,10 +1063,8 @@ void utc_callback(void)
 		if(lock_timeout > 0)
 			lock_timeout--;					//锁屏倒计时
 	}
-	seg_flash_task();
+//	seg_flash_task();
 	
-	for(i = 0; i < 7; i++)
-		UART_PRINTF("",);
 //	UART_PRINTF("@@@@@@@@@@@@@@@@@@@@@@@ UTC_TASK exit\r\n");
 	ke_timer_set(UTC_TASK, TASK_APP, 100);
 }

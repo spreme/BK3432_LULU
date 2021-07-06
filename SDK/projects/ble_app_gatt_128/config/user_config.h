@@ -53,7 +53,7 @@
 //	#define UART_1_INIT			1		//串口1初始化
 //	#define UART_1_PRINTF		1		//串口1打印
 
-	#define MOTOR_DELAY			Delay_ms(1000)			//喂食结束延时停止电机时间
+	#define MOTOR_DELAY			Delay_ms(100)			//喂食结束延时停止电机时间
 #endif
 
 //******************************* 可用宏定义 ***********************************************//
@@ -129,8 +129,12 @@
 #define APP_ADV_FAST_INT        (32)
 
 #define FEED_MAX_NUM	4
-#define BLE_SAVE_ADDR	0x1C000
-#define BLE_PLAN_ADDR	0x1D000
+#define BLE_SAVE_ADDR	0x80
+#define BLE_PLAN_ADDR	0x8000
+#define FLASH_SIZE_ONE	512
+
+//bk3432用户存储有3个nvr区域，每个区域512字节，区域的首地址分别是0x80，0x8000，0x8080
+
 
 enum FEED_STATUS_TYPE {
 	FEED_STEP_NONE = 0,
@@ -142,7 +146,7 @@ enum FEED_STATUS_TYPE {
 };
 
 typedef struct {
-	uint8_t mark;
+	uint32_t mark;
 	uint32_t rtc_timestamp;				//时间戳
 	uint32_t record_time;				//录音时长
 	uint8_t led_backlight_pwm;			//背光灯亮度		
@@ -156,7 +160,7 @@ typedef struct {
 } FEED_INFO_t;
 
 typedef struct {
-	uint8_t mark;
+	uint32_t mark;
 	FEED_INFO_t plans[FEED_MAX_NUM];
 } FEED_PLAN_t;
 
@@ -164,7 +168,6 @@ extern FEED_PLAN_t feed_plan;
 extern SAVE_INFO_t save_info;
 
 extern uint8_t lock_flag;				//设备锁标志
-extern uint8_t key_scan_flag;			//正在检查按键标志
 extern uint8_t key_flag;				//按键触发类型
 extern uint8_t reset_flag;				//复位标志
 extern uint8_t key_lock;				//锁按键标志
@@ -174,6 +177,9 @@ extern uint32_t lock_timeout;			//锁屏超时时间
 //void ht1621_set_dat(uint8_t addr, uint8_t val);
 void beep_test(void);
 extern uint8_t feed_status;
+
+void printf_flash_info(void);
+void flash_data_init(uint8_t type);
 
 /*******************************************************************************
  *#############################################################################*
@@ -203,12 +209,15 @@ extern uint8_t feed_status;
 #include "pwm.h"
 #endif
 
+#include "string.h"
+
 #include "gpio.h"
 #include "rf.h"
 #include "uart2.h"
 #include "uart.h"
 #include "flash.h"
 #include "motor.h"
+#include "nvds.h"
 
 #include "lcd.h"
 #include "function.h"

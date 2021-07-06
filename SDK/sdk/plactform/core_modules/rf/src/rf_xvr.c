@@ -193,7 +193,8 @@ void Delay_ms(int num) //sync from svn revision 18
 	int x, y;
 	for(y = 0; y < num; y ++ )
 	{
-		for(x = 0; x < 3260; x++);
+//		for(x = 0; x < 3260; x++);
+		for(x = 0; x < 1405; x++);
 	}
 
 }
