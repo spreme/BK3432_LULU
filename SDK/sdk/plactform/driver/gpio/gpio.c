@@ -274,8 +274,6 @@ void gpio_init(void)
 	gpio_config(MOTOR_PIN_P, OUTPUT, PULL_NONE);
 	gpio_config(SOUND_PLAY, OUTPUT, PULL_NONE);
 	gpio_config(SOUND_REC, OUTPUT, PULL_NONE);
-	gpio_config(LINK_LED, OUTPUT, PULL_NONE);
-	gpio_config(PWR_LED, OUTPUT, PULL_NONE);
 	
 	gpio_config(HT1621_DAT, OUTPUT, PULL_NONE);
 	gpio_config(HT1621_WR, OUTPUT, PULL_NONE);
@@ -290,9 +288,12 @@ void gpio_init(void)
 	gpio_set(SOUND_PLAY, 0);
 	gpio_set(SOUND_REC, 0);
 
-	SET_LED_OFF(LINK_LED);
-	SET_LED_OFF(PWR_LED);
-
+	#ifndef NO_LED_E
+	gpio_config(LINK_LED, OUTPUT, PULL_NONE);
+	gpio_config(PWR_LED, OUTPUT, PULL_NONE);
+	led_control(LED_OFF,LED_OFF);
+	#endif
+	
 	//input
 	gpio_config(MOTOR_DET, INPUT, PULL_HIGH);
 	gpio_config(CHARGE_DET, INPUT, PULL_NONE);

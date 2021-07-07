@@ -32,6 +32,7 @@
 	#define FEED_ONE_DELAY 		100		//喂食一份后延时停止电机时间
 	#define LOCK_KEY_E			1		//锁键按键
 	#define FEED_KEY_E			1		//喂食按键
+	#define NO_LED_E			1		//无灯
 
 	#define MOTOR_REVERSE		1		//电机反转功能
 	#define UART_2_INIT			1		//串口2初始化
@@ -64,6 +65,7 @@
 	#define FEED_KEY_E			1		//喂食按键
 	#define MOTOR_REVERSE		1		//电机反转功能
 	#define BACKLIGHT_CONTROL	1		//背光灯控制亮度
+	#define NO_LED_E			1		//无灯
 	
 	#define UART_2_INIT			1		//串口2初始化
 	#define UART_2_PRINTF		1		//串口2打印
@@ -157,6 +159,7 @@ typedef struct {
 	uint8_t hour;
 	uint8_t minute;
 	uint8_t weight;
+	uint8_t music;
 } FEED_INFO_t;
 
 typedef struct {
@@ -180,6 +183,7 @@ extern uint8_t feed_status;
 
 void printf_flash_info(void);
 void flash_data_init(uint8_t type);
+void led_control(uint8_t link_led, uint8_t red_led);
 
 /*******************************************************************************
  *#############################################################################*

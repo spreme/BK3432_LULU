@@ -780,15 +780,13 @@ void rec_key_callback(void)
 	{
 		if(rec_key_tick <= 10)
 		{
-			SET_LED_ON(PWR_LED);
-			SET_LED_OFF(LINK_LED);
+			led_control(LED_OFF,LED_ON);
 
 			UART_PRINTF("play sound !!\r\n");
 
 			play_record_control();
 			
-			SET_LED_OFF(PWR_LED);
-			SET_LED_ON(LINK_LED);
+			led_control(LED_ON,LED_OFF);
 		}
 		else
 		{
@@ -798,8 +796,7 @@ void rec_key_callback(void)
 			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
 			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 
-			SET_LED_OFF(PWR_LED);
-			SET_LED_ON(LINK_LED);
+			led_control(LED_ON,LED_OFF);
 		}
 		rec_key_tick = 0;
 	}
@@ -811,8 +808,7 @@ void rec_key_callback(void)
 		{
 			gpio_set(SOUND_REC, 1);
 			save_info.record_time++;
-			SET_LED_ON(PWR_LED);
-			SET_LED_OFF(LINK_LED);
+			led_control(LED_OFF,LED_ON);
 		}
 		if(rec_key_tick >= 110)
 		{
@@ -821,8 +817,7 @@ void rec_key_callback(void)
 			UART_PRINTF("rec over !!\r\n");
 			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
 			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
-			SET_LED_OFF(PWR_LED);
-			SET_LED_ON(LINK_LED);
+			led_control(LED_ON,LED_OFF);
 		}
 		else
 		{

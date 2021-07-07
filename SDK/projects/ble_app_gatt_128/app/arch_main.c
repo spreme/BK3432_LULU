@@ -436,6 +436,7 @@ void rw_main(void)
 			feed_info_func.hour = 0;
 			feed_info_func.minute = 0;
 			feed_info_func.weight = 1;//¸Ä
+			feed_info_func.music = 0;
 			feed_error = feed_run(&feed_info_func);
 			
 			feed_one_flag = 0;
