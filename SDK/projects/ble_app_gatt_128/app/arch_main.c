@@ -238,6 +238,7 @@ void beep_init(void)
 void flash_data_init(uint8_t type)
 {
 	//复位
+	UART_PRINTF("flash_data_init:%d \n",type);
 	if(type > 0)
 	{
 		#if defined NO_RECORD_FUNC || defined KEY_BUZZER_FUNC
@@ -260,14 +261,17 @@ void flash_data_init(uint8_t type)
 
 		memset(&feed_plan, 0, sizeof(FEED_PLAN_t));
 		feed_plan.mark = FLASH_KEEP_VAL;
-		flash_erase(FLASH_SPACE_TYPE_NVR,BLE_PLAN_ADDR,FLASH_SIZE_ONE);
+//		flash_erase(FLASH_SPACE_TYPE_NVR,BLE_PLAN_ADDR,FLASH_SIZE_ONE);
+		flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR);
 		UART_PRINTF("reset feed_plan 1\n");
 		flash_write(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR, sizeof(FEED_PLAN_t), (uint8_t *)&feed_plan);
 
 		memset(&save_info, 0, sizeof(SAVE_INFO_t));
 		save_info.mark = FLASH_KEEP_VAL;
-		flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+//		flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+		flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
 		UART_PRINTF("reset save_info 1\n");
+		save_info.led_backlight_pwm = 5;
 		flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 		
 		
@@ -288,7 +292,8 @@ void flash_data_init(uint8_t type)
 			UART_PRINTF("reset flash  feed_plan\r\n");
 			memset(&feed_plan, 0, sizeof(FEED_PLAN_t));
 			feed_plan.mark = FLASH_KEEP_VAL;
-			flash_erase(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR, FLASH_SIZE_ONE);
+//			flash_erase(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR, FLASH_SIZE_ONE);
+			flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR);
 			flash_write(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR, sizeof(FEED_PLAN_t), (uint8_t *)&feed_plan);
 		}
 		
@@ -298,7 +303,8 @@ void flash_data_init(uint8_t type)
 
 			memset(&save_info, 0, sizeof(SAVE_INFO_t));
 			save_info.mark = FLASH_KEEP_VAL;
-			flash_erase(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, FLASH_SIZE_ONE);
+//			flash_erase(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, FLASH_SIZE_ONE);
+			flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
 			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 		}
 	}
@@ -374,8 +380,8 @@ void rw_main(void)
 
 	bdaddr_env_init();
 
+	adc_init(0,1);
 	gpio_init();
-	adc_init(0);
 
 	REG_AHB0_ICU_INT_ENABLE |= (0x01 << 15); //BLE INT
 	REG_AHB0_ICU_IRQ_ENABLE = 0x03;
@@ -386,25 +392,25 @@ void rw_main(void)
 
 	UART_PRINTF("start \r\n");
 
+	UART_PRINTF("version:%s \r\n",USER_VERSION);
+	UART_PRINTF("data:%s \r\n",USER_DATA);
 
-//	RTC_DATE_DESC RTC_date;
-//	memset(&RTC_date, 0, sizeof(RTC_date));
-//	rtc_alarm_init(1, &RTC_date, 1000, user_rtc_isr);				//时钟中断  1s中断一次
-	ht1621_init();
-	ht1621_clean();					//清屏
-	ht1621_disp(LOCK, 1);			//显示锁
-	ht1621_disp(LOCK_CLOSE, 1);		//显示锁关闭
-	
 	beep_init();
 	#ifdef BACKLIGHT_CONTROL
 	backlight_init();
 	#endif
 	
 	utc_update();
-//	utc_set_clock((1624021500 + 28800));
+	utc_set_clock(1);
 	
-	get_time();
+	flash_data_init(0);
+
+	ht1621_init();
+	ht1621_clean();					//清屏
+	ht1621_disp(LOCK, 1);			//显示锁
+	ht1621_disp(LOCK_CLOSE, 1);		//显示锁关闭
 	disp_voltage();					//显示电量
+	get_time();
 
 	/*
 	 ***************************************************************************
@@ -421,30 +427,39 @@ void rw_main(void)
 		if(utc_flag == 0)
 		{
 			utc_flag = 1;
+			get_time();
 			ke_timer_set(UTC_TASK, TASK_APP, 100);
 		}
 
 		if(feed_one_flag)
 		{
 			UART_PRINTF("feed_one_flag\n");
-			if(lock_flag == 0)
-			{
-				beep_test();
-				lock_timeout = LOCK_TIMEOUT_TIME;
-			}
+//			if(lock_flag == 0)
+//			{
+//				beep_test();
+//				lock_timeout = LOCK_TIMEOUT_TIME;
+//			}
 			
 			feed_info_func.hour = 0;
 			feed_info_func.minute = 0;
 			feed_info_func.weight = 1;//改
+			#ifdef FEED_KEY_MUSIC_E
+			feed_info_func.music = 1;
+			#else
 			feed_info_func.music = 0;
+			#endif
+			
 			feed_error = feed_run(&feed_info_func);
 			
 			feed_one_flag = 0;
+			
+			beep_flag = 0;
 			
 			set_key_tick = 0;				//设置按键计时
 			dowm_key_tick = 0;				//下按键计时
 			up_key_tick = 0;				//上按键计时
 			lock_key_tick = 0;				//锁键按键计时
+			feed_key_tick = 0;				//喂食按键计时
 			key_flag = 0;
 		}
 				

@@ -776,27 +776,30 @@ uint32_t rec_key_tick = 0;
 
 void rec_key_callback(void)
 {
+	beep_flag = 0;
 	if(gpio_get_input(RECORD_KEY))
 	{
 		if(rec_key_tick <= 10)
 		{
-			led_control(LED_OFF,LED_ON);
+			led_control(LED_OFF,LED_ON,10);
 
 			UART_PRINTF("play sound !!\r\n");
 
 			play_record_control();
 			
-			led_control(LED_ON,LED_OFF);
+			led_control(LED_ON,LED_OFF,0);
 		}
 		else
 		{
 			gpio_set(SOUND_REC, 0);
 			UART_PRINTF("rec over !!\r\n");
 			
-			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+//			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+			flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
 			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 
-			led_control(LED_ON,LED_OFF);
+			led_control(LED_ON,LED_OFF,0);
+			lock_timeout = LOCK_TIMEOUT_TIME;
 		}
 		rec_key_tick = 0;
 	}
@@ -808,16 +811,18 @@ void rec_key_callback(void)
 		{
 			gpio_set(SOUND_REC, 1);
 			save_info.record_time++;
-			led_control(LED_OFF,LED_ON);
+			led_control(LED_OFF,LED_ON,10);
 		}
 		if(rec_key_tick >= 110)
 		{
 			rec_key_tick = 0;
 			gpio_set(SOUND_REC, 0);
 			UART_PRINTF("rec over !!\r\n");
-			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+//			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+			flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
 			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
-			led_control(LED_ON,LED_OFF);
+			led_control(LED_ON,LED_OFF,0);
+			lock_timeout = LOCK_TIMEOUT_TIME;
 		}
 		else
 		{
@@ -828,45 +833,65 @@ void rec_key_callback(void)
 	}
 }
 
+enum KEY_STATE_E
+{
+	KEY_SET_E = 0x1,
+	KEY_UP_E = 0x2,
+	KEY_DOWM_E = 0x4,
+	KEY_LOCK_E = 0x8,
+	KEY_FEED_E = 0x10,	
+	KEY_RECORD_E = 0x20,	
+};
+
 uint8_t get_key_state()
 {
+	uint8_t key_flag_e = 0;
+	
 	if(gpio_get_input(SET_KEY) <= 0)
 	{
-		return 1;
+		key_flag_e = key_flag_e | KEY_SET_E;
+//		return KEY_SET_E;
 	}
 	if(gpio_get_input(UP_KEY) <= 0)
 	{
-		return 2;
+		key_flag_e = key_flag_e | KEY_UP_E;
 	}
 	if(gpio_get_input(DOWN_KEY) <= 0)
 	{
-		return 3;
+		key_flag_e = key_flag_e | KEY_DOWM_E;
 	}
 	#ifdef LOCK_KEY_E
 	if(gpio_get_input(LOCK_KEY) <= 0)
 	{
-		return 4;
+		key_flag_e = key_flag_e | KEY_LOCK_E;
 	}
 	#endif
 	#ifdef FEED_KEY_E
 	if(gpio_get_input(FEED_KEY) <= 0)
 	{
-		return 5;
+		key_flag_e = key_flag_e | KEY_FEED_E;
 	}
 	#endif
 	
-	return 0;
+	return key_flag_e;
 }
 
 uint32_t set_key_tick = 0;				//设置按键计时
 uint32_t dowm_key_tick = 0;				//下按键计时
 uint32_t up_key_tick = 0;				//上按键计时
 uint32_t lock_key_tick = 0;				//锁键按键计时
+uint32_t feed_key_tick = 0;				//喂食按键计时
 
 void key_scan_callback(void)
 {
 //	UART_PRINTF("key_scan_callback\r\n");
 	static uint16_t reset_time = 0;
+
+	keep_dowm_flag = get_key_state();
+	if(keep_dowm_flag)
+	{
+		ke_timer_set(KEY_SCAN_TASK, TASK_APP, 10);	
+	}
 	
 	if(key_scan_flag == 0)
 	{
@@ -877,21 +902,21 @@ void key_scan_callback(void)
 				key_flag = KEY_SET_S;
 				UART_PRINTF("key_flag = KEY_SET_S\r\n");
 			}
-			else if(up_key_tick > KEY_LONG_TIME)
+			else if(set_key_tick > KEY_LONG_TIME_SET)
 			{
 				key_flag = KEY_SET_L_UP;
 				UART_PRINTF("key_flag = KEY_SET_L_UP\r\n");
 			}
-			set_key_tick = 0;		
+			set_key_tick = 0;
 		}
-		else
+		else if(keep_dowm_flag == KEY_SET_E || key_flag == KEY_SET_L)
 		{
 			set_key_tick++;
-			if(set_key_tick > KEY_LONG_TIME)
+			if(set_key_tick == KEY_LONG_TIME_SET)
 			{
 				key_flag = KEY_SET_L;
 				UART_PRINTF("key_flag = KEY_SET_L\r\n");
-				set_key_tick = 0;
+//				set_key_tick = 0;
 			}
 		}
 		
@@ -909,14 +934,14 @@ void key_scan_callback(void)
 			}
 			up_key_tick = 0;		
 		}
-		else
+		else if(keep_dowm_flag == KEY_UP_E || key_flag == KEY_UP_L)
 		{
 			up_key_tick++;
-			if(up_key_tick > KEY_LONG_TIME)
+			if(up_key_tick == KEY_LONG_TIME)
 			{
 				key_flag = KEY_UP_L;
 				UART_PRINTF("key_flag = KEY_UP_L\r\n");
-				up_key_tick = 0;
+//				up_key_tick = 0;
 			}
 		}
 		
@@ -934,22 +959,72 @@ void key_scan_callback(void)
 			}
 			dowm_key_tick = 0;		
 		}
-		else
+		else if(keep_dowm_flag == KEY_DOWM_E || key_flag == KEY_DOWM_L)
 		{
 			dowm_key_tick++;
-			if(dowm_key_tick > KEY_LONG_TIME)
+			if(dowm_key_tick == KEY_LONG_TIME)
 			{
-				key_flag = KEY_DOWN_L;
-				UART_PRINTF("key_flag = KEY_DOWN_L\r\n");
-				dowm_key_tick = 0;
+				key_flag = KEY_DOWM_L;
+				UART_PRINTF("key_flag = KEY_DOWM_L\r\n");
+//				dowm_key_tick = 0;
 			}
 		}
-	}
-	if(get_key_state())
-	{
-		ke_timer_set(KEY_SCAN_TASK, TASK_APP, 10);	
+
+		#ifdef LOCK_KEY_E
+		if(gpio_get_input(LOCK_KEY))
+		{
+			if(lock_key_tick <= KEY_SHORT_TIME && lock_key_tick != 0)				//按键时间小于1s
+			{
+				key_flag = KEY_LOCK_S;
+				UART_PRINTF("key_flag = KEY_LOCK_S\r\n");
+			}
+			else if(lock_key_tick > KEY_LONG_TIME_SET)
+			{
+				key_flag = KEY_LOCK_L_UP;
+				UART_PRINTF("key_flag = KEY_LOCK_L_UP\r\n");
+			}
+			lock_key_tick = 0;
+		}
+		else if(keep_dowm_flag == KEY_LOCK_E || key_flag == KEY_LOCK_L)
+		{
+			lock_key_tick++;
+			if(lock_key_tick == KEY_LONG_TIME_SET)
+			{
+				key_flag = KEY_LOCK_L;
+				UART_PRINTF("key_flag = KEY_LOCK_L\r\n");
+//				lock_key_tick = 0;
+			}
+		}
+		#endif
+		#ifdef FEED_KEY_E
+		if(gpio_get_input(FEED_KEY))
+		{
+			if(feed_key_tick <= KEY_SHORT_TIME && feed_key_tick != 0)				//按键时间小于1s
+			{
+				key_flag = KEY_FEED_S;
+				UART_PRINTF("key_flag = KEY_FEED_S\r\n");
+			}
+			else if(feed_key_tick > KEY_LONG_TIME)
+			{
+				key_flag = KEY_FEED_L_UP;
+				UART_PRINTF("key_flag = KEY_FEED_L_UP\r\n");
+			}
+			feed_key_tick = 0;
+		}
+		else if(keep_dowm_flag == KEY_FEED_E || key_flag == KEY_FEED_L)
+		{
+			feed_key_tick++;
+			if(feed_key_tick == KEY_LONG_TIME)
+			{
+				key_flag = KEY_FEED_L;
+				UART_PRINTF("key_flag = KEY_FEED_L\r\n");
+//				feed_key_tick = 0;
+			}
+		}
+		#endif	
 	}
 	
+	#ifndef FEED_KEY_E
 	if(gpio_get_input(UP_KEY) == 0 && gpio_get_input(SET_KEY) == 0)
 	{
 		if(set_time_flag == 0 && set_val_flag == 0 && lock_flag == 0)
@@ -957,10 +1032,15 @@ void key_scan_callback(void)
 			feed_one_flag = 1;
 		}
 	}
+	#endif
 	
 	if(lock_flag)
 	{
+		#if defined PT01K_BK
 		if(gpio_get_input(UP_KEY) == 0)
+		#elif defined LNH_01
+		if(gpio_get_input(UP_KEY) == 0 && gpio_get_input(DOWN_KEY) == 0)
+		#endif
 		{
 			reset_time++;
 			if(reset_time >= 100)
@@ -969,28 +1049,12 @@ void key_scan_callback(void)
 				reset_time = 0;
 			}
 		}
+		else
+		{
+			reset_time = 0;
+		}
 	}
 	
-	#ifdef LOCK_KEY_E
-	if(gpio_get_input(LOCK_KEY))
-	{
-		
-	}
-	else
-	{
-	
-	}
-	#endif
-	#ifdef FEED_KEY_E
-	if(gpio_get_input(FEED_KEY))
-	{
-		
-	}
-	else
-	{
-	
-	}
-	#endif
 	
 }
 
@@ -1002,20 +1066,23 @@ uint8_t old_sec = 66;
 int i;
 void utc_callback(void)
 {
-	tuya_ble_time_struct_data_t t_struct;
-	uint32_t t_now = 0;
+//	tuya_ble_time_struct_data_t t_struct;
+//	uint32_t t_now = 0;
+	UTCTimeStruct tm_s;
 
-	memset(&t_struct, 0, sizeof(tuya_ble_time_struct_data_t));
+	utc_get_time(&tm_s);
+
+//	memset(&t_struct, 0, sizeof(tuya_ble_time_struct_data_t));
 		
-	utc_update();
-	t_now = utc_get_clock();
-	tuya_ble_utc_sec_2_mytime(t_now, &t_struct, 0);
+//	utc_update();
+//	t_now = utc_get_clock();
+//	tuya_ble_utc_sec_2_mytime(t_now, &t_struct, 0);
 
 	
 //	UART_PRINTF("get_key_state:%d \r\n",get_key_state());
 //	if(old_sec != t_struct.nSec)
 	{
-		old_sec = t_struct.nSec;
+		old_sec = tm_s.seconds;
 		if(get_feed_info_flag == 0 && set_time_flag == 0 && set_val_flag == 0)
 		{
 			if(reverse) 
@@ -1032,24 +1099,29 @@ void utc_callback(void)
 			disp_voltage();
 		}
 		
-		if(old_min != t_struct.nMin)
+		if(old_min != tm_s.minutes)
 		{
-			old_min = t_struct.nMin;
+			old_min = tm_s.minutes;
 			check_feed_flag = 1;
 			save_time++;
 			
-			UART_PRINTF("%04d-%02d-%02d %02d:%02d:%02d weekday:%02d\r\n",
-				t_struct.nYear, t_struct.nMonth, t_struct.nDay,
-				t_struct.nHour, t_struct.nMin, t_struct.nSec, t_struct.DayIndex);
+			UART_PRINTF("%04d-%02d-%02d %02d:%02d:%02d \r\n",
+				tm_s.year, tm_s.month, tm_s.day,
+				tm_s.hour, tm_s.minutes, tm_s.seconds);
 
 		}
 		
 		if(save_time > 100)
 		{
-			save_info.rtc_timestamp = t_now;
+//			rtc_timestamp = t_now;
 			UART_PRINTF("save save_time 11\n");
+			save_info.rtc_hour = tm_s.hour;
+			save_info.rtc_minute = tm_s.minutes;
+			
+			UART_PRINTF("save time:%ld-%ld \n",save_info.rtc_hour, save_info.rtc_minute);
 
-			flash_erase(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, FLASH_SIZE_ONE);
+//			flash_erase(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, FLASH_SIZE_ONE);
+			flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
 			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 
 			save_time = 0;
@@ -1058,6 +1130,13 @@ void utc_callback(void)
 		if(lock_timeout > 0)
 			lock_timeout--;					//锁屏倒计时
 	}
+	
+//	int aaa = 0;
+//	aaa = gpio_get_input(CHARGE_DET);
+//	UART_PRINTF("DC_DET:%d\r\n", aaa);
+//	aaa = gpio_get_input(SET_KEY);
+//	UART_PRINTF("SET_KEY:%d\r\n", aaa);
+	feed_error_led();					//红灯处理
 //	seg_flash_task();
 	
 //	UART_PRINTF("@@@@@@@@@@@@@@@@@@@@@@@ UTC_TASK exit\r\n");

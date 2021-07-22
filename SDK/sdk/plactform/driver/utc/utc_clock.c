@@ -16,6 +16,7 @@
 #include <stddef.h>        // standard definition
 #include "lld_evt.h"
 #include "utc_clock.h"
+#include "uart2.h"
 
 
 
@@ -75,14 +76,19 @@ void utc_set_time(UTCTimeStruct *tm)
 	myTime.seconds = tm->seconds;
 
 	//set clock
-	utc_set_clock( utc_convert_utc_secs( &myTime ) );
+	utc_set_clock(utc_convert_utc_secs(&myTime));
+	UART_PRINTF("utc_set_clock: %ld\r\n", utc_convert_utc_secs(&myTime));
 
+	utc_update();
 }
 
 
 void utc_get_time(UTCTimeStruct *tm)
 {
+	utc_update();
 	utc_convert_utc_time( tm, utc_get_clock());
+//	UART_PRINTF("utc_get_clock: %ld\r\n", utc_get_clock());
+
 	tm->month ++;
 	tm->day ++;
 	tm->year= (uint16_t)( tm->year -2000 );

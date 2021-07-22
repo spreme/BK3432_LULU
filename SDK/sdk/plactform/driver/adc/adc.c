@@ -7,7 +7,7 @@
 #include "gpio.h"
 #include "adc.h"
 
-void adc_init(uint8_t mode)
+void adc_init(uint8_t mode,uint8_t channel)
 {
 	uint32_t cfg;
 
@@ -17,7 +17,7 @@ void adc_init(uint8_t mode)
 	REG_AHB0_ICU_ADCCLKCON = (0x5 << 1);
 		
 	//set special as peripheral func
-	gpio_config(GPIOD_0 + 2,FLOAT,PULL_NONE);
+	gpio_config(GPIOD_0 + channel,FLOAT,PULL_NONE);
 
 	//set adc mode/channel/wait clk
 	//cfg  = ( (mode << BIT_ADC_MODE ) | (chanle << BIT_ADC_CHNL) | (0x01 << BIT_ADC_WAIT_CLK_SETTING));

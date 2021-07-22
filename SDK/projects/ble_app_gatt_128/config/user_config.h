@@ -23,16 +23,21 @@
  //#######################################################################################//
 //#################################### 型号定义 ##########################################//
 //#######################################################################################//
-//#define LNH_01					1		//廖工-前海一凡按键板
-#define PT01K_BK				1		//小派按键带屏版
+#define LNH_01					1		//廖工-前海一凡按键板
+//#define PT01K_BK				1		//小派按键带屏版
 
 #if defined LNH_01
+#define USER_VERSION 	"LNH_01.0.2"
+#define USER_DATA 		"20210721"
+
 //	#define RTC_TIME			1		//外部时钟计时
 	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
 	#define FEED_ONE_DELAY 		100		//喂食一份后延时停止电机时间
 	#define LOCK_KEY_E			1		//锁键按键
 	#define FEED_KEY_E			1		//喂食按键
+	#define FEED_KEY_MUSIC_E	1		//按键喂食播音
 	#define NO_LED_E			1		//无灯
+	#define BL_CONTROL_E		1		//背光灯控制
 
 	#define MOTOR_REVERSE		1		//电机反转功能
 	#define UART_2_INIT			1		//串口2初始化
@@ -44,9 +49,13 @@
 #endif
 
 #if defined PT01K_BK
+#define USER_VERSION 	"PT01K_BK.0.2"
+#define USER_DATA 		"20210721"
+
 //	#define RTC_TIME			1		//外部时钟计时
 	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
 	#define FEED_ONE_DELAY 		100		//喂食一份后延时停止电机时间
+	#define BACKLIGHT_CONTROL	1		//背光灯控制亮度
 
 	#define MOTOR_REVERSE		1		//电机反转功能
 	#define UART_2_INIT			1		//串口2初始化
@@ -149,9 +158,10 @@ enum FEED_STATUS_TYPE {
 
 typedef struct {
 	uint32_t mark;
-	uint32_t rtc_timestamp;				//时间戳
+	uint32_t rtc_hour;					//时间小时
+	uint32_t rtc_minute;				//时间分钟
 	uint32_t record_time;				//录音时长
-	uint8_t led_backlight_pwm;			//背光灯亮度		
+	uint32_t led_backlight_pwm;			//背光灯亮度		
 } SAVE_INFO_t;
 
 
@@ -174,8 +184,11 @@ extern uint8_t lock_flag;				//设备锁标志
 extern uint8_t key_flag;				//按键触发类型
 extern uint8_t reset_flag;				//复位标志
 extern uint8_t key_lock;				//锁按键标志
+extern uint8_t beep_flag;				//蜂鸣器响标志
+extern uint8_t keep_dowm_flag;			//按键长按标志
 
 extern uint32_t lock_timeout;			//锁屏超时时间
+extern uint32_t rtc_timestamp;			//时间戳时间
 
 //void ht1621_set_dat(uint8_t addr, uint8_t val);
 void beep_test(void);
@@ -183,7 +196,8 @@ extern uint8_t feed_status;
 
 void printf_flash_info(void);
 void flash_data_init(uint8_t type);
-void led_control(uint8_t link_led, uint8_t red_led);
+void led_control(uint8_t link_led, uint8_t red_led, uint8_t led_level);
+void feed_error_led(void);
 
 /*******************************************************************************
  *#############################################################################*
