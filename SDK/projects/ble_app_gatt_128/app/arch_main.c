@@ -254,9 +254,13 @@ void flash_data_init(uint8_t type)
 		Delay_ms(100);
 		pwm_buzzer_en(0);
 		#else
-		gpio_set(SOUND_REC, 1);
-		Delay_ms(300);
-		gpio_set(SOUND_REC, 0);
+		gpio_set(SOUND_REC, RECORD_ON);
+		#ifdef NEW_RECORD_IC
+		Delay_ms(1300);
+		#else
+		Delay_ms(300);	
+		#endif
+		gpio_set(SOUND_REC, RECORD_OFF);
 		#endif
 
 		memset(&feed_plan, 0, sizeof(FEED_PLAN_t));

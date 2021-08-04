@@ -791,7 +791,7 @@ void rec_key_callback(void)
 		}
 		else
 		{
-			gpio_set(SOUND_REC, 0);
+			gpio_set(SOUND_REC, RECORD_OFF);
 			UART_PRINTF("rec over !!\r\n");
 			
 //			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
@@ -809,14 +809,14 @@ void rec_key_callback(void)
 		
 		if(rec_key_tick > 10)
 		{
-			gpio_set(SOUND_REC, 1);
+			gpio_set(SOUND_REC, RECORD_ON);
 			save_info.record_time++;
 			led_control(LED_OFF,LED_ON,10);
 		}
 		if(rec_key_tick >= 110)
 		{
 			rec_key_tick = 0;
-			gpio_set(SOUND_REC, 0);
+			gpio_set(SOUND_REC, RECORD_OFF);
 			UART_PRINTF("rec over !!\r\n");
 //			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
 			flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);

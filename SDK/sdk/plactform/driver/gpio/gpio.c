@@ -300,8 +300,8 @@ void gpio_init(void)
 	gpio_set(BL_EN, 0);
 
 	gpio_set(MOTOR_PIN_P, 0);
-	gpio_set(SOUND_PLAY, 0);
-	gpio_set(SOUND_REC, 0);
+	gpio_set(SOUND_PLAY, PLAYER_OFF);
+	gpio_set(SOUND_REC, RECORD_OFF);
 
 	#ifndef NO_LED_E
 	gpio_config(LINK_LED, OUTPUT, PULL_NONE);

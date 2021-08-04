@@ -23,8 +23,8 @@
  //#######################################################################################//
 //#################################### 型号定义 ##########################################//
 //#######################################################################################//
-#define LNH_01					1		//廖工-前海一凡按键板
-//#define PT01K_BK				1		//小派按键带屏版
+//#define LNH_01					1		//廖工-前海一凡按键板
+#define PT01K_BK				1		//小派按键带屏版
 
 #if defined LNH_01
 #define USER_VERSION 	"LNH_01.0.2"
@@ -49,8 +49,8 @@
 #endif
 
 #if defined PT01K_BK
-#define USER_VERSION 	"PT01K_BK.0.2"
-#define USER_DATA 		"20210721"
+#define USER_VERSION 	"PT01K_BK.0.3"
+#define USER_DATA 		"20210729"
 
 //	#define RTC_TIME			1		//外部时钟计时
 	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
@@ -62,6 +62,9 @@
 	#define UART_2_PRINTF		1		//串口2打印
 //	#define UART_1_INIT			1		//串口1初始化
 //	#define UART_1_PRINTF		1		//串口1打印
+
+	#define NEW_RECORD_IC		1		//新录音IC，低电平有效
+
 
 	#define MOTOR_DELAY			Delay_ms(100)			//喂食结束延时停止电机时间
 #endif
