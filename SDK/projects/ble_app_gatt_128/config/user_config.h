@@ -49,8 +49,8 @@
 #endif
 
 #if defined PT01K_BK
-#define USER_VERSION 	"PT01K_BK.0.3"
-#define USER_DATA 		"20210729"
+#define USER_VERSION 	"PT01K_BK.0.5"
+#define USER_DATA 		"20210812"
 
 //	#define RTC_TIME			1		//外部时钟计时
 	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
@@ -64,6 +64,7 @@
 //	#define UART_1_PRINTF		1		//串口1打印
 
 	#define NEW_RECORD_IC		1		//新录音IC，低电平有效
+	#define REC_BACK_SET		1		//录音按键返回设置上一项
 
 
 	#define MOTOR_DELAY			Delay_ms(100)			//喂食结束延时停止电机时间
@@ -78,6 +79,7 @@
 	#define MOTOR_REVERSE		1		//电机反转功能
 	#define BACKLIGHT_CONTROL	1		//背光灯控制亮度
 	#define NO_LED_E			1		//无灯
+	#define REC_BACK_SET		1		//录音按键返回设置上一项
 	
 	#define UART_2_INIT			1		//串口2初始化
 	#define UART_2_PRINTF		1		//串口2打印

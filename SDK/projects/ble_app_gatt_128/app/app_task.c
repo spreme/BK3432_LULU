@@ -777,58 +777,61 @@ uint32_t rec_key_tick = 0;
 void rec_key_callback(void)
 {
 	beep_flag = 0;
-	if(gpio_get_input(RECORD_KEY))
+	if(set_val_flag == 0)
 	{
-		if(rec_key_tick <= 10)
+		if(gpio_get_input(RECORD_KEY))
 		{
-			led_control(LED_OFF,LED_ON,10);
+			if(rec_key_tick <= 10)
+			{
+				led_control(LED_OFF,LED_ON,10);
 
-			UART_PRINTF("play sound !!\r\n");
+				UART_PRINTF("play sound !!\r\n");
 
-			play_record_control();
-			
-			led_control(LED_ON,LED_OFF,0);
-		}
-		else
-		{
-			gpio_set(SOUND_REC, RECORD_OFF);
-			UART_PRINTF("rec over !!\r\n");
-			
-//			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
-			flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
-			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
+				play_record_control();
+				
+				led_control(LED_ON,LED_OFF,0);
+			}
+			else
+			{
+				gpio_set(SOUND_REC, RECORD_OFF);
+				UART_PRINTF("rec over !!\r\n");
+				
+	//			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+				flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
+				flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 
-			led_control(LED_ON,LED_OFF,0);
-			lock_timeout = LOCK_TIMEOUT_TIME;
-		}
-		rec_key_tick = 0;
-	}
-	else
-	{
-		rec_key_tick++;
-		
-		if(rec_key_tick > 10)
-		{
-			gpio_set(SOUND_REC, RECORD_ON);
-			save_info.record_time++;
-			led_control(LED_OFF,LED_ON,10);
-		}
-		if(rec_key_tick >= 110)
-		{
+				led_control(LED_ON,LED_OFF,0);
+				lock_timeout = LOCK_TIMEOUT_TIME;
+			}
 			rec_key_tick = 0;
-			gpio_set(SOUND_REC, RECORD_OFF);
-			UART_PRINTF("rec over !!\r\n");
-//			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
-			flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
-			flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
-			led_control(LED_ON,LED_OFF,0);
-			lock_timeout = LOCK_TIMEOUT_TIME;
 		}
 		else
 		{
-//			UART_PRINTF("@@@@@@@@@@@@@@@@@@@@@@@ REC_KEY_TASK exit\r\n");
+			rec_key_tick++;
+			
+			if(rec_key_tick > 10)
+			{
+				gpio_set(SOUND_REC, RECORD_ON);
+				save_info.record_time++;
+				led_control(LED_OFF,LED_ON,10);
+			}
+			if(rec_key_tick >= 110)
+			{
+				rec_key_tick = 0;
+				gpio_set(SOUND_REC, RECORD_OFF);
+				UART_PRINTF("rec over !!\r\n");
+	//			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+				flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
+				flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
+				led_control(LED_ON,LED_OFF,0);
+				lock_timeout = LOCK_TIMEOUT_TIME;
+			}
+			else
+			{
+	//			UART_PRINTF("@@@@@@@@@@@@@@@@@@@@@@@ REC_KEY_TASK exit\r\n");
 
-			ke_timer_set(REC_KEY_TASK, TASK_APP, 10);
+				ke_timer_set(REC_KEY_TASK, TASK_APP, 10);
+			}
 		}
 	}
 }
@@ -860,6 +863,10 @@ uint8_t get_key_state()
 	{
 		key_flag_e = key_flag_e | KEY_DOWM_E;
 	}
+	if(gpio_get_input(RECORD_KEY) <= 0)
+	{
+		key_flag_e = key_flag_e | KEY_RECORD_E;
+	}
 	#ifdef LOCK_KEY_E
 	if(gpio_get_input(LOCK_KEY) <= 0)
 	{
@@ -881,6 +888,7 @@ uint32_t dowm_key_tick = 0;				//下按键计时
 uint32_t up_key_tick = 0;				//上按键计时
 uint32_t lock_key_tick = 0;				//锁键按键计时
 uint32_t feed_key_tick = 0;				//喂食按键计时
+uint32_t record_key_tick = 0;			//录音按键计时
 
 void key_scan_callback(void)
 {
@@ -970,6 +978,31 @@ void key_scan_callback(void)
 			}
 		}
 
+		if(gpio_get_input(RECORD_KEY))
+		{
+			if(record_key_tick <= KEY_SHORT_TIME && record_key_tick != 0)				//按键时间小于1s
+			{
+				key_flag = KEY_RECORD_S;
+				UART_PRINTF("key_flag = KEY_RECORD_S\r\n");
+			}
+			else if(record_key_tick > KEY_LONG_TIME_SET)
+			{
+				key_flag = KEY_RECORD_L_UP;
+				UART_PRINTF("key_flag = KEY_RECORD_L_UP\r\n");
+			}
+			record_key_tick = 0;
+		}
+		else if(keep_dowm_flag == KEY_RECORD_E || key_flag == KEY_RECORD_L)
+		{
+			record_key_tick++;
+			if(record_key_tick == KEY_LONG_TIME_SET)
+			{
+				key_flag = KEY_RECORD_L;
+				UART_PRINTF("key_flag = KEY_RECORD_L\r\n");
+			}
+		}
+
+			
 		#ifdef LOCK_KEY_E
 		if(gpio_get_input(LOCK_KEY))
 		{

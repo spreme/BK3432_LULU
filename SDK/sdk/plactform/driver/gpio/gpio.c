@@ -199,9 +199,10 @@ static void gpio_irq_handler(uint32_t pin)
 		{
 			case RECORD_KEY:
 			UART_PRINTF("RECORD_KEY \r\n");
-			if(lock_flag == 0)
+			if(lock_flag == 0 && (set_val_flag == 0))
 				ke_timer_set(REC_KEY_TASK, TASK_APP, 10);
-			
+			else if(set_val_flag)
+				ke_timer_set(KEY_SCAN_TASK, TASK_APP, 10);
 			break;
 
 			case SET_KEY:
