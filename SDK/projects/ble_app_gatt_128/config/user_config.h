@@ -20,49 +20,35 @@
 #include "tuya_ble_unix_time.h"
 
 
- //#######################################################################################//
+//#######################################################################################//
 //#################################### 型号定义 ##########################################//
 //#######################################################################################//
-//#define LNH_01					1		//廖工-前海一凡按键板
 #define PT01K_BK				1		//小派按键带屏版
 
-#if defined LNH_01
-#define USER_VERSION 	"LNH_01.0.2"
-#define USER_DATA 		"20210721"
+#define FEED_INFO_AUTO_TEST     1
 
-//	#define RTC_TIME			1		//外部时钟计时
-	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
-	#define FEED_ONE_DELAY 		100		//喂食一份后延时停止电机时间
-	#define LOCK_KEY_E			1		//锁键按键
-	#define FEED_KEY_E			1		//喂食按键
-	#define FEED_KEY_MUSIC_E	1		//按键喂食播音
-	#define NO_LED_E			1		//无灯
-	#define BL_CONTROL_E		1		//背光灯控制
-
-	#define MOTOR_REVERSE		1		//电机反转功能
-	#define UART_2_INIT			1		//串口2初始化
-	#define UART_2_PRINTF		1		//串口2打印
-//	#define UART_1_INIT			1		//串口1初始化
-//	#define UART_1_PRINTF		1		//串口1打印
-
-	#define MOTOR_DELAY			Delay_ms(1000)			//喂食结束延时停止电机时间
-#endif
+#define BLE_ADVERTISING			0		//开启广播
 
 #if defined PT01K_BK
-#define USER_VERSION 	"PT01K_BK.0.5"
+#define USER_VERSION 	"PT01K_BK.0.4"
 #define USER_DATA 		"20210812"
 
 //	#define RTC_TIME			1		//外部时钟计时
 	#define BATTERY_CHAN		1		//ADC检测电池电量的通道口
 	#define FEED_ONE_DELAY 		100		//喂食一份后延时停止电机时间
-	#define BACKLIGHT_CONTROL	1		//背光灯控制亮度
+//	#define BACKLIGHT_CONTROL	1		//背光灯控制亮度
 
-	#define MOTOR_REVERSE		1		//电机反转功能
+//	#define MOTOR_REVERSE		1		//电机反转功能
 	#define UART_2_INIT			1		//串口2初始化
 	#define UART_2_PRINTF		1		//串口2打印
 //	#define UART_1_INIT			1		//串口1初始化
 //	#define UART_1_PRINTF		1		//串口1打印
 
+	#define LOCK_KEY_E      	1
+	#define OK_KEY_E         	1
+	#define FEED_KEY_E      	1
+	
+	#define KEY_DOWN_HIGHT    	1
 	#define NEW_RECORD_IC		1		//新录音IC，低电平有效
 	#define REC_BACK_SET		1		//录音按键返回设置上一项
 
@@ -144,7 +130,7 @@
 /// Fast advertising interval
 #define APP_ADV_FAST_INT        (32)
 
-#define FEED_MAX_NUM	4
+#define FEED_MAX_NUM	10
 #define BLE_SAVE_ADDR	0x80
 #define BLE_PLAN_ADDR	0x8000
 #define FLASH_SIZE_ONE	512
@@ -194,6 +180,12 @@ extern uint8_t keep_dowm_flag;			//按键长按标志
 
 extern uint32_t lock_timeout;			//锁屏超时时间
 extern uint32_t rtc_timestamp;			//时间戳时间
+
+extern uint8_t led_flag;
+extern uint8_t unlock_flag;
+extern uint8_t get_meal_flag;
+
+extern uint8_t meal;
 
 //void ht1621_set_dat(uint8_t addr, uint8_t val);
 void beep_test(void);

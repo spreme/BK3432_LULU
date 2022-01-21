@@ -45,7 +45,7 @@
 #include "wdt.h"
 #include "utc_clock.h"
 #include "tuya_ble_unix_time.h"
-
+#include "tm1638.h"
 /*
  * LOCAL FUNCTION DEFINITIONS
  ****************************************************************************************
@@ -180,7 +180,9 @@ static int gapm_cmp_evt_handler(ke_msg_id_t const msgid,
                 // Go to the ready state
                 ke_state_set(TASK_APP, APPM_READY);
 							
-//				appm_start_advertising();
+				#if BLE_ADVERTISING
+				appm_start_advertising();
+				#endif
             }
         }
         break;
@@ -208,7 +210,9 @@ static int gapm_cmp_evt_handler(ke_msg_id_t const msgid,
                 ke_state_set(TASK_APP, APPM_READY);
 				
 				//device not bonded, start general adv
-//				appm_start_advertising();
+				#if BLE_ADVERTISING
+				appm_start_advertising();
+				#endif
             }
 		}
         break;
@@ -367,7 +371,9 @@ static int gapc_connection_req_ind_handler(ke_msg_id_t const msgid,
     else
     {
         // No connection has been establish, restart advertising
-//		appm_start_advertising();
+		#if BLE_ADVERTISING
+		appm_start_advertising();
+		#endif
     }
 
     return (KE_MSG_CONSUMED);
@@ -475,8 +481,9 @@ static int gapc_disconnect_ind_handler(ke_msg_id_t const msgid,
 	wdt_disable_flag = 1;
 
 	// Restart Advertising
-//	appm_start_advertising();
-
+	#if BLE_ADVERTISING
+	appm_start_advertising();
+	#endif
 	
     return (KE_MSG_CONSUMED);
 }
@@ -779,51 +786,58 @@ void rec_key_callback(void)
 	beep_flag = 0;
 	if(set_val_flag == 0)
 	{
-		if(gpio_get_input(RECORD_KEY))
+		if(gpio_get_input(RECORD_KEY) <= 0)
 		{
+			
 			if(rec_key_tick <= 10)
 			{
-				led_control(LED_OFF,LED_ON,10);
-
+//				led_control(LED_OFF,LED_ON,10);
+				SEG9[12]|=0X40;
+				
 				UART_PRINTF("play sound !!\r\n");
 
 				play_record_control();
 				
-				led_control(LED_ON,LED_OFF,0);
+//				led_control(LED_ON,LED_OFF,0);
+				SEG9[12]&=~0X40;
 			}
 			else
 			{
 				gpio_set(SOUND_REC, RECORD_OFF);
 				UART_PRINTF("rec over !!\r\n");
 				
+				SEG9[12]&=~0X40;
+				
 	//			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
 				flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
 				flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
 
-				led_control(LED_ON,LED_OFF,0);
+//				led_control(LED_ON,LED_OFF,0);
 				lock_timeout = LOCK_TIMEOUT_TIME;
 			}
 			rec_key_tick = 0;
 		}
 		else
-		{
+		{			
 			rec_key_tick++;
+			
+			SEG9[12]|=0X40;
 			
 			if(rec_key_tick > 10)
 			{
 				gpio_set(SOUND_REC, RECORD_ON);
 				save_info.record_time++;
-				led_control(LED_OFF,LED_ON,10);
+//				led_control(LED_OFF,LED_ON,10);
 			}
 			if(rec_key_tick >= 110)
 			{
 				rec_key_tick = 0;
 				gpio_set(SOUND_REC, RECORD_OFF);
 				UART_PRINTF("rec over !!\r\n");
-	//			flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
+//				flash_erase(FLASH_SPACE_TYPE_NVR,BLE_SAVE_ADDR,FLASH_SIZE_ONE);
 				flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR);
 				flash_write(FLASH_SPACE_TYPE_NVR, BLE_SAVE_ADDR, sizeof(SAVE_INFO_t), (uint8_t *)&save_info);
-				led_control(LED_ON,LED_OFF,0);
+//				led_control(LED_ON,LED_OFF,0);
 				lock_timeout = LOCK_TIMEOUT_TIME;
 			}
 			else
@@ -843,43 +857,102 @@ enum KEY_STATE_E
 	KEY_DOWM_E = 0x4,
 	KEY_LOCK_E = 0x8,
 	KEY_FEED_E = 0x10,	
-	KEY_RECORD_E = 0x20,	
+	KEY_RECORD_E = 0x20,
+	KEY_OK_E = 0x40,
 };
 
+
 uint8_t get_key_state()
-{
+{	
 	uint8_t key_flag_e = 0;
-	
-	if(gpio_get_input(SET_KEY) <= 0)
+		
+	if(gpio_get_input(SET_KEY))
 	{
 		key_flag_e = key_flag_e | KEY_SET_E;
-//		return KEY_SET_E;
+		//return KEY_SET_E;	
+		SEG9[12]|=0X04;
 	}
-	if(gpio_get_input(UP_KEY) <= 0)
+	else
+	{
+		SEG9[12]&=~0x04;
+	}
+	
+	if(gpio_get_input(UP_KEY))
 	{
 		key_flag_e = key_flag_e | KEY_UP_E;
+		if(set_val_flag == 0 && lock_flag == 0)
+			SEG9[13]|=0XF;
+		else if(set_val_flag)
+			SEG9[12]|=0X20;			
 	}
+	else
+	{
+		SEG9[12]&=~0X20;
+		SEG9[13]&=~0XF;
+	}
+	
 	if(gpio_get_input(DOWN_KEY) <= 0)
 	{
 		key_flag_e = key_flag_e | KEY_DOWM_E;
+		if(set_val_flag == 0 && lock_flag == 0)
+			SEG9[12]|=0X01;
+		else if(set_val_flag)
+			SEG9[12]|=0X02;			
 	}
-	if(gpio_get_input(RECORD_KEY) <= 0)
+	else
 	{
-		key_flag_e = key_flag_e | KEY_RECORD_E;
+		SEG9[12]&=~0x03;
 	}
+	
+	if(gpio_get_input(RECORD_KEY) && lock_flag == 0)
+	{
+		key_flag_e = key_flag_e | KEY_RECORD_E;	
+		SEG9[12]|=0X40;
+	}
+	else
+	{
+		SEG9[12]&=~0X40;
+	}
+	
 	#ifdef LOCK_KEY_E
-	if(gpio_get_input(LOCK_KEY) <= 0)
+	if(gpio_get_input(LOCK_KEY))
 	{
 		key_flag_e = key_flag_e | KEY_LOCK_E;
-	}
-	#endif
-	#ifdef FEED_KEY_E
-	if(gpio_get_input(FEED_KEY) <= 0)
-	{
-		key_flag_e = key_flag_e | KEY_FEED_E;
+		if(get_meal_flag == 1)
+		{
+			SEG9[6]|=0X80;
+		}
+		if(get_meal_flag == 3)
+		{
+			SEG9[6]&=~0X80;			
+		}
 	}
 	#endif
 	
+	#ifdef FEED_KEY_E
+	if(gpio_get_input(FEED_KEY) && lock_flag == 0)
+	{
+		key_flag_e = key_flag_e | KEY_FEED_E;
+		SEG9[12]|=0X08;
+	}
+	else
+	{
+		SEG9[12]&=~0X08;
+	}
+	#endif
+	
+	#ifdef OK_KEY_E
+	if(gpio_get_input(OK_KEY) && lock_flag == 0)
+	{
+		key_flag_e = key_flag_e | KEY_OK_E;	
+		SEG9[12]|=0X10;
+	}
+	else
+	{
+		SEG9[12]&=~0x10;
+	}
+	#endif
+		
 	return key_flag_e;
 }
 
@@ -889,6 +962,8 @@ uint32_t up_key_tick = 0;				//上按键计时
 uint32_t lock_key_tick = 0;				//锁键按键计时
 uint32_t feed_key_tick = 0;				//喂食按键计时
 uint32_t record_key_tick = 0;			//录音按键计时
+
+uint32_t ok_key_tick = 0;
 
 void key_scan_callback(void)
 {
@@ -903,7 +978,7 @@ void key_scan_callback(void)
 	
 	if(key_scan_flag == 0)
 	{
-		if(gpio_get_input(SET_KEY))
+		if(gpio_get_input(SET_KEY) <= 0)
 		{
 			if(set_key_tick <= KEY_SHORT_TIME && set_key_tick != 0)				//按键时间小于1s
 			{
@@ -928,17 +1003,19 @@ void key_scan_callback(void)
 			}
 		}
 		
-		if(gpio_get_input(UP_KEY))
+		if(gpio_get_input(UP_KEY) <= 0)
 		{
 			if(up_key_tick <= KEY_SHORT_TIME && up_key_tick != 0)				//按键时间小于1s
 			{
 				key_flag = KEY_UP_S;
 				UART_PRINTF("key_flag = KEY_UP_S\r\n");
+				
 			}
 			else if(up_key_tick > KEY_LONG_TIME)
 			{
 				key_flag = KEY_UP_L_UP;
 				UART_PRINTF("key_flag = KEY_UP_L_UP\r\n");
+				
 			}
 			up_key_tick = 0;		
 		}
@@ -959,11 +1036,13 @@ void key_scan_callback(void)
 			{
 				key_flag = KEY_DOWN_S;
 				UART_PRINTF("key_flag = KEY_DOWN_S\r\n");
+				
 			}
 			else if(dowm_key_tick > KEY_LONG_TIME)
 			{
 				key_flag = KEY_DOWN_L_UP;
 				UART_PRINTF("key_flag = KEY_DOWN_L_UP\r\n");
+
 			}
 			dowm_key_tick = 0;		
 		}
@@ -978,7 +1057,7 @@ void key_scan_callback(void)
 			}
 		}
 
-		if(gpio_get_input(RECORD_KEY))
+		if(gpio_get_input(RECORD_KEY) <= 0)
 		{
 			if(record_key_tick <= KEY_SHORT_TIME && record_key_tick != 0)				//按键时间小于1s
 			{
@@ -1004,7 +1083,7 @@ void key_scan_callback(void)
 
 			
 		#ifdef LOCK_KEY_E
-		if(gpio_get_input(LOCK_KEY))
+		if(gpio_get_input(LOCK_KEY) <= 0)
 		{
 			if(lock_key_tick <= KEY_SHORT_TIME && lock_key_tick != 0)				//按键时间小于1s
 			{
@@ -1024,13 +1103,15 @@ void key_scan_callback(void)
 			if(lock_key_tick == KEY_LONG_TIME_SET)
 			{
 				key_flag = KEY_LOCK_L;
-				UART_PRINTF("key_flag = KEY_LOCK_L\r\n");
+				UART_PRINTF("key_flag = KEY_LOCK_L\r\n");	
 //				lock_key_tick = 0;
 			}
 		}
 		#endif
+		
+		
 		#ifdef FEED_KEY_E
-		if(gpio_get_input(FEED_KEY))
+		if(gpio_get_input(FEED_KEY) <= 0)
 		{
 			if(feed_key_tick <= KEY_SHORT_TIME && feed_key_tick != 0)				//按键时间小于1s
 			{
@@ -1057,8 +1138,38 @@ void key_scan_callback(void)
 		#endif	
 	}
 	
+		#ifdef OK_KEY_E
+		if(gpio_get_input(OK_KEY) <= 0)
+		{
+			if(ok_key_tick <= KEY_SHORT_TIME && ok_key_tick != 0)				//按键时间小于1s
+			{
+				key_flag = KEY_OK_S;
+				UART_PRINTF("key_flag = KEY_OK_S\r\n");				
+			}
+			else if(ok_key_tick > KEY_LONG_TIME_SET)
+			{
+				key_flag = KEY_OK_L_UP;
+				UART_PRINTF("key_flag = KEY_OK_L_UP\r\n");
+			}
+			ok_key_tick = 0;
+		}
+		else if(keep_dowm_flag == KEY_OK_E || key_flag == KEY_OK_L)
+		{
+			ok_key_tick++;
+			if(ok_key_tick == KEY_LONG_TIME_SET)
+			{
+				key_flag = KEY_OK_L;
+				UART_PRINTF("key_flag = KEY_OK_L\r\n");
+				
+//				ok_key_tick = 0;
+			}
+		}
+		#endif
+
+	
 	#ifndef FEED_KEY_E
-	if(gpio_get_input(UP_KEY) == 0 && gpio_get_input(SET_KEY) == 0)
+	if(gpio_get_input(UP_KEY) && gpio_get_input(SET_KEY))
+//	if(gpio_get_input(UP_KEY) && gpio_get_input(SET_KEY) && gpio_get_input(OK_KEY))
 	{
 		if(set_time_flag == 0 && set_val_flag == 0 && lock_flag == 0)
 		{
@@ -1070,9 +1181,9 @@ void key_scan_callback(void)
 	if(lock_flag)
 	{
 		#if defined PT01K_BK
-		if(gpio_get_input(UP_KEY) == 0)
-		#elif defined LNH_01
-		if(gpio_get_input(UP_KEY) == 0 && gpio_get_input(DOWN_KEY) == 0)
+		if(gpio_get_input(SET_KEY))
+//		#elif defined LNH_01
+//		if(gpio_get_input(UP_KEY) && gpio_get_input(DOWN_KEY))
 		#endif
 		{
 			reset_time++;
@@ -1080,15 +1191,14 @@ void key_scan_callback(void)
 			{
 				reset_flag = 1;
 				reset_time = 0;
-			}
+			}			
 		}
 		else
 		{
 			reset_time = 0;
 		}
 	}
-	
-	
+		
 }
 
 uint8_t reverse = 1;
@@ -1113,24 +1223,47 @@ void utc_callback(void)
 
 	
 //	UART_PRINTF("get_key_state:%d \r\n",get_key_state());
-//	if(old_sec != t_struct.nSec)
+	if(old_sec != tm_s.seconds)
 	{
 		old_sec = tm_s.seconds;
 		if(get_feed_info_flag == 0 && set_time_flag == 0 && set_val_flag == 0)
 		{
-			if(reverse) 
-			{
-				ht1621_disp(COL, 1);
-				reverse = 0;
-			} 
-			else 
-			{
-				ht1621_disp(COL, 0);
-				reverse = 1;
-			}
+	
+//			if(reverse) 
+//			{
+			
+//				reverse = 0;
+//			} 
+//			else 
+//			{
+
+//				reverse = 1;
+//			}			
 			get_time();
-			disp_voltage();
+			
+//			test_feed_info();
 		}
+	}
+
+		if(unlock_flag)
+		{			
+			lock_led();
+			
+			if(led_flag == 0)
+			{
+				SEG9[12]|=0X80;
+			}
+		}
+		else
+		{
+			SEG9[12]&=~0X80;
+		}
+				
+//		disp_voltage();
+		
+		display();
+
+
 		
 		if(old_min != tm_s.minutes)
 		{
@@ -1144,7 +1277,7 @@ void utc_callback(void)
 
 		}
 		
-		if(save_time > 100)
+		if(save_time == 1)
 		{
 //			rtc_timestamp = t_now;
 			UART_PRINTF("save save_time 11\n");
@@ -1162,18 +1295,19 @@ void utc_callback(void)
 		
 		if(lock_timeout > 0)
 			lock_timeout--;					//锁屏倒计时
-	}
-	
+//	}
+
+		
 //	int aaa = 0;
 //	aaa = gpio_get_input(CHARGE_DET);
 //	UART_PRINTF("DC_DET:%d\r\n", aaa);
 //	aaa = gpio_get_input(SET_KEY);
 //	UART_PRINTF("SET_KEY:%d\r\n", aaa);
-	feed_error_led();					//红灯处理
+//	feed_error_led();					//红灯处理
 //	seg_flash_task();
 	
 //	UART_PRINTF("@@@@@@@@@@@@@@@@@@@@@@@ UTC_TASK exit\r\n");
-	ke_timer_set(UTC_TASK, TASK_APP, 100);
+	ke_timer_set(UTC_TASK, TASK_APP, 10);
 }
 
 static int app_utc_handler(ke_msg_id_t const msgid,

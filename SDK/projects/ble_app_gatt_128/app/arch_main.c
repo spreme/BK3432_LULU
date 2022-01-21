@@ -61,6 +61,9 @@
 #include "utc_clock.h"
 #include "tuya_ble_unix_time.h"
 #include "ke_timer.h"
+#include "tm1638.h"
+
+//#include "delay.c"
 /**
  ****************************************************************************************
  * @addtogroup DRIVERS
@@ -400,19 +403,20 @@ void rw_main(void)
 	UART_PRINTF("data:%s \r\n",USER_DATA);
 
 	beep_init();
-	#ifdef BACKLIGHT_CONTROL
-	backlight_init();
-	#endif
+//	#ifdef BACKLIGHT_CONTROL
+//	backlight_init();
+//	#endif
 	
 	utc_update();
 	utc_set_clock(1);
 	
 	flash_data_init(0);
 
-	ht1621_init();
-	ht1621_clean();					//清屏
-	ht1621_disp(LOCK, 1);			//显示锁
-	ht1621_disp(LOCK_CLOSE, 1);		//显示锁关闭
+//	ht1621_init();
+//	ht1621_clean();					//清屏
+//	ht1621_disp(LOCK, 1);			//显示锁
+//	ht1621_disp(LOCK_CLOSE, 1);		//显示锁关闭
+
 	disp_voltage();					//显示电量
 	get_time();
 
@@ -421,28 +425,42 @@ void rw_main(void)
 	 * Main loop
 	 ***************************************************************************
 	 */
-	 	
+	 
+//	init_TM1638();
+	TM1638_init();
+	
 	while(1)
 	{		
 		//schedule all pending events
+				
 		rwip_schedule();
 		wdt_enable(0xffff);
-				
+		
+//		TM1638_Write_DATA(0x00,0xff);
+//		TM1638_Write_DATA(0x02,0xff);
+//		TM1638_Write_DATA(0x04,0xff);
+//		TM1638_Write_DATA(0x06,0xff);
+
+		
+		SEG9[4]|=0X13;
+		SEG9[5]|=0XF;
+	
+		
 		if(utc_flag == 0)
 		{
 			utc_flag = 1;
 			get_time();
-			ke_timer_set(UTC_TASK, TASK_APP, 100);
+			ke_timer_set(UTC_TASK, TASK_APP, 10);
 		}
 
 		if(feed_one_flag)
 		{
 			UART_PRINTF("feed_one_flag\n");
-//			if(lock_flag == 0)
-//			{
-//				beep_test();
-//				lock_timeout = LOCK_TIMEOUT_TIME;
-//			}
+			if(lock_flag == 0)
+			{
+				beep_test();
+				lock_timeout = LOCK_TIMEOUT_TIME;
+			}
 			
 			feed_info_func.hour = 0;
 			feed_info_func.minute = 0;
@@ -464,6 +482,7 @@ void rw_main(void)
 			up_key_tick = 0;				//上按键计时
 			lock_key_tick = 0;				//锁键按键计时
 			feed_key_tick = 0;				//喂食按键计时
+			ok_key_tick = 0;
 			key_flag = 0;
 		}
 				
@@ -474,7 +493,7 @@ void rw_main(void)
 			flash_data_init(1); 				//清空单片机,恢复出厂
 			
 //			record_reset_control();
-//			wdt_enable(10);
+			wdt_enable(10);
 		}
 		
 		if(check_feed_flag)						//喂食检测：一分钟置1一次
@@ -508,7 +527,8 @@ void rw_main(void)
 		}
 		
 		key_func();
-
+		
+//		test_feed_info();
 		
 		// Checks for sleep have to be done with interrupt disabled
 		//睡眠检查必须在中断被禁用的情况下进行

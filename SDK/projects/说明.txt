@@ -1,0 +1,16 @@
+bim：
+ancs:苹果
+gatt：蓝牙协议栈
+gma：
+LLSync：腾讯云发布标准蓝牙协议
+remote：遥控
+wechat：微信
+
+
+
+
+
+
+
+
+

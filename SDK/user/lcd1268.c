@@ -22,156 +22,90 @@
  如果是其他字段则占用一个字节，但只能表示4位 */
 //static uint8_t lcd_buf[8] = {0};
 
-static void ht1621_set_bith(uint8_t val, uint8_t cnt)
+char table[]={0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,
+0x07,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71};
+
+
+/*延时**/
+//void delay_nop(unsigned char i)
+//{
+//	unsigned char x;
+//	for(x=0;x<i;x++)
+//	{
+//		__nop();__nop();
+//	}
+//}
+
+/*写数据*/
+void tm1628_writeonebyte(unsigned char command)
 {
-//	uint8_t i;
-//	for (i=0; i<cnt; i++) {
-//		if ((val&0x80) == 0)
-//			gpio_set(DIO, 0);
-//		else
+//	unsigned char i;
+//	for(i=8;i>0;i--)
+//	{
+//		if( (command&0x01))
+//		{
 //			gpio_set(DIO, 1);
-//		
-//		gpio_set(CLK, 0);
-////		__nop();__nop();
-//		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-//		gpio_set(CLK, 1);
-////		__nop();__nop();
-//		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-//		val <<= 1;
-//	}
-}
-
-static void ht1621_set_bitl(uint8_t val, uint8_t cnt)
-{
-//	uint8_t i;
-//	for (i=0; i<cnt; i++) {
-//		if ((val&0x01) == 0)
-//			gpio_set(DIO, 0);
+//		}
 //		else
-//			gpio_set(DIO, 1);
+//		{
+//			gpio_set(DIO, 0);
+//		}
 //		gpio_set(CLK, 0);
-////		__nop();__nop();
-//		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
+//		delay_nop(10);
+//		command= command >>1;
 //		gpio_set(CLK, 1);
-////		__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-//		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-//		val >>= 1;
 //	}
+//	delay_nop(40);
+
 }
 
-static uint8_t ht1621_get_dat(uint8_t addr)
-{
-//	uint8_t i, val = 0;
-
-//	gpio_set(STB, 0);
-//	ht1621_set_bith(0xc0, 3);
-//	ht1621_set_bith(addr<<2, 6);
-
-//	for (i=0; i<4; i++) {
-////		HT1621_RD = 0;
-////		__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-//		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-////		HT1621_RD = 1;
-////		__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-//		__nop();__nop();__nop();__nop();
-////		__nop();__nop();__nop();__nop();
-//		val <<= 1;
-//		val |= DIO;
-//	}
+/*写命令*/
+void tm1628_wrcom(unsigned char com)
+{        
 //	gpio_set(STB, 1);
-///*	uart_send_buf(&val, 1);
-//	val = DIO;
-//	uart_send_buf(&val, 1);*/
+//	delay_nop(5);
+//	gpio_set(STB, 0);
+//	delay_nop(2);
+//	tm1628_writeonebyte(com);
+//	delay_nop(2);
+}
+
+/*写地址，table数值*/
+void tm1628_adderdat(unsigned char add,unsigned char dat)
+{        
+//	gpio_set(STB, 1);
+//	delay_nop(5);
+//	gpio_set(STB, 0);
+//	delay_nop(2);
+//	tm1628_writeonebyte(add);
+//	tm1628_writeonebyte(table[dat]);
+//	delay_nop(2);
+
+}
+
+/*指定地址，显示数*/
+void tm1628_display(unsigned char adder,unsigned char val)
+{
+//	tm1628_wrcom(0x03);    // 4位13段 
+//	tm1628_wrcom(0x44);    // 固定地址
 //	
-//	gpio_set(CLK, 1);
-//	gpio_set(DIO, 1);
-////	gpio_set(HT1621_RD, 1);
-//	
-//	return val;
-}
-
-static void ht1621_set_cmd(uint8_t cmd)
-{
-//	gpio_set(STB, 0);
-//	ht1621_set_bith(0x80, 3);
-//	ht1621_set_bith(cmd, 9);
+//	tm1628_adderdat(adder,val);
+//	tm1628_wrcom(0x8f);    //开显示
 //	gpio_set(STB, 1);
-//	gpio_set(CLK, 1);
-//	gpio_set(DIO, 1);
-////	gpio_set(HT1621_RD, 1);
+//	delay_nop(100);
 }
 
-//static void ht1621_set_dat(uint8_t addr, uint8_t val)
-void ht1621_set_dat(uint8_t addr, uint8_t val)
-{
-//	gpio_set(STB, 0);
-//	ht1621_set_bith(0xa0, 3);
-//	ht1621_set_bith(addr<<2, 6);
-//	ht1621_set_bitl(val, 4);
-//	gpio_set(STB, 1);
-//	gpio_set(CLK, 1);
-//	gpio_set(DIO, 1);
-////	gpio_set(HT1621_RD, 1);
-}
+/*-------------------------------*/
+//uint8_t task_delay_flash = FLASH_PERIOD;
+//uint8_t lcd_update = 0;
 
-void ht1621_init(void)
-{ 
-//	gpio_set(STB, 1);
-//	gpio_set(CLK, 1);
-//	gpio_set(DIO, 1);
-////	gpio_set(HT1621_RD, 1);
-//	Delay_ms(5);
-//	ht1621_set_cmd(HT_BISA_COM);
-//	ht1621_set_cmd(HT_SYS_EN);
-////	ht1621_set_cmd(HT_TIMER_DIS);
-////	ht1621_set_cmd(HT_WDT_DIS);
-////	ht1621_set_cmd(HT_TONE_DIS);
-////	ht1621_set_cmd(HT_IRQ_DIS);
-//	ht1621_set_cmd(HT_LCD_ON);
-}
-/*
-void ht1621_down(void)
-{
-//	ht1621_set_cmd(HT_LCD_OFF);
-//	ht1621_set_cmd(HT_SYS_DIS);
-}
-*/
-void ht1621_clean(void)
-{  
-//	uint8_t i;
-//	uint8_t addr = 0;
-
-//	for (i=0; i<32; i++) {
-//		ht1621_set_dat(addr, 0x00);
-//		addr++;
+//void seg_flash_task(void)
+//{
+//	lcd_update++;
+//	if (lcd_update >= 60) {
+//		lcd_update = 0;
 //	}
-
-//	ht1621_get_dat(9);
-//	ht1621_get_dat(8);
-}
-
-///*-------------------------------*/
-uint8_t task_delay_flash = FLASH_PERIOD;
-uint8_t lcd_update = 0;
-
-void seg_flash_task(void)
-{
-	lcd_update++;
-	if (lcd_update >= 60) {
-		lcd_update = 0;
-	}
-}
+//}
 
 
 //#if 0
@@ -366,9 +300,9 @@ void seg_flash_task(void)
 //}
 //#endif
 
-//#ifdef PT01K_BK
-//void ht1621_disp_dat(uint8_t addr, uint8_t dat)
-//{
+#ifdef PT01K_BK
+void ht1621_disp_dat(uint8_t addr, uint8_t dat)
+{
 //	uint8_t addr_l = 0, addr_h = 0;
 //	uint8_t data_l = 0, data_h = 0;
 //	uint8_t index = 0;
@@ -399,10 +333,10 @@ void seg_flash_task(void)
 ////	UART_PRINTF("addr_l:%d 	data_l:0x%02X\n", addr_l, data_l);
 //	ht1621_set_dat(addr_h, data_h);
 //	ht1621_set_dat(addr_l, data_l);
-//}
+}
 
-//void ht1621_disp(uint8_t seg, uint8_t disp)
-//{
+void ht1621_disp(uint8_t seg, uint8_t disp)
+{
 //	uint8_t lcd_buf_offset = 0;
 //	uint8_t seg_mask = 0;
 //	uint8_t addr;
@@ -507,10 +441,10 @@ void seg_flash_task(void)
 ////	ht1621_set_dat(addr, lcd_buf[lcd_buf_offset]);
 //	ht1621_set_dat(addr, seg_mask);
 
-//}
+}
 
 
-//#endif
+#endif
 //#ifdef F04
 //void ht1621_disp_dat(uint8_t addr, uint8_t dat)
 //{

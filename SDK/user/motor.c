@@ -258,7 +258,7 @@ uint16_t motor_run(void)
 					UART_PRINTF("feed det and out \r\n");
 					key_cont = 0;
 					wdt_enable(0xffff);
-					reverse_flag = 0;
+//					reverse_flag = 0;
 					#ifndef MOTOR_DET_ADDR
 					UART_PRINTF("timeout:%d \r\n",timeout);
 					return timeout;
@@ -586,7 +586,8 @@ char feed_run(FEED_INFO_t * info)
 	while(i)
 	{
 		i--;
-		Delay_ms(100);
+		Delay_ms(100);				//按下单次喂食键后，等一会电机才会转
+//		Delay_ms(50);			
 	}
 	
 	#ifdef DOOR_CONTROL

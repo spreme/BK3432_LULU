@@ -194,6 +194,7 @@ void appm_disconnect(void)
 
 void appm_start_advertising(void)
 {	
+#if BLE_ADVERTISING
     // Check if the advertising procedure is already is progress
     if (ke_state_get(TASK_APP) == APPM_READY)
     {				
@@ -314,6 +315,7 @@ void appm_start_advertising(void)
         ke_state_set(TASK_APP, APPM_ADVERTISING);	
     }
 	
+#endif
     // else ignore the request
 }
 

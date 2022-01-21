@@ -1,0 +1,11 @@
+*.s
+*.BAT
+*.uvgui
+*.uvopt
+*.uvproj
+*.uvgui.*
+*.uvopt.*
+lst
+output
+obj
+

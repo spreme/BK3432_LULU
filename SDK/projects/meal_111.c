@@ -1,83 +1,16 @@
-#include "function.h"
-#include "wdt.h"
-#include "rwip.h"
-#include "tm1638.h"
-
-uint8_t lock_flag = 1;				//设备锁标志
-uint8_t key_lock = 0;				//锁按键标志
-uint8_t key_scan_flag = 0;			//正在检查按键标志
-uint8_t key_flag = 0;				//按键触发类型
-uint8_t reset_flag = 0;				//复位标志
-uint8_t get_feed_info_flag = 0;		//查看喂食计划标志
-uint8_t set_time_flag = 0;			//正在设置时间标志
-uint8_t set_val_flag = 0;			//正在设置数值标志
-uint8_t record_flag = 0;
-
-uint32_t lock_timeout = LOCK_TIMEOUT_TIME;		//锁屏超时时间
-uint32_t rtc_timestamp = 1;						//时间戳时间
-
-	
-uint8_t display_flag = 0;			//第一次显示标志(第一次显示第一位会导致后面显示异常，传数值进去显示一次第二位解决)
-uint8_t display_val = 0;			//第一次显示值
-uint8_t beep_flag = 0;				//蜂鸣器响标志
-uint8_t keep_dowm_flag = 0;			//按键长按标志
-
-uint8_t set_back_flag = 0;			//设置上一个标志
-
-uint8_t led_flag;
-uint8_t unlock_flag = 0;
-
-uint8_t get_meal_flag = 0;
-
-uint8_t key_scan(void)
-{	
-	uint8_t key_flag_send = 0;
-	
-	if(key_flag > 0)
-	{
-		key_scan_flag = 1;
-		
-//		set_key_tick = 0;				//设置按键计时
-//		dowm_key_tick = 0;				//下按键计时
-//		up_key_tick = 0;				//上按键计时
-//		lock_key_tick = 0;				//锁键按键计时
-//		feed_key_tick = 0;				//喂食按键计时
-//		
-//		ok_key_tick = 0;
-
-		key_flag_send = key_flag;
-		key_flag = 0;
-		UART_PRINTF("!!!!!!!!!!!!!!! !!!!!!! key_scan:%d \r\n",key_flag_send);
-	}
-	key_scan_flag = 0;
-	return key_flag_send;
-}
-
-void clean_key_flag()
+int set_val(uint8_t addr, int dat, char min, char max)
 {
-	key_flag = 0;
-	set_key_tick = 0;	
-	key_scan_flag = 0;
-	dowm_key_tick = 0;				//下按键计时
-	up_key_tick = 0;				//上按键计时
-	record_key_tick = 0;
-	
-//	ok_key_tick = 0;
-}
-
-int set_val(uint8_t addr, int* dat, char min, char max)
-{
-	char val = *dat;
+	char val = dat;
 	int status;
 	uint8_t key_value;
-	int timeout = 500;
+	int timeout = 700;
 	uint8_t reverse;
 	uint8_t lcd_update_old = 0;
 	uint8_t lcd_update_time = 0;
 
 	UART_PRINTF("########## enter set_val \r\n");
-	set_val_flag = 1;						//正在设置数值标志
-	Delay_ms(200);
+//	set_val_flag = 1;						//脮媒脭脷脡猫脰脙脢媒脰碌卤锚脰戮
+//	Delay_ms(200);
 	while (timeout) 
 	{
 		rwip_schedule();
@@ -90,9 +23,9 @@ int set_val(uint8_t addr, int* dat, char min, char max)
 
 		if (key_value) 
 		{			
-			lock_timeout = LOCK_TIMEOUT_TIME;//无操作20s后锁屏
+			lock_timeout = LOCK_TIMEOUT_TIME;//脦脼虏脵脳梅20s潞贸脣酶脝脕
 			clean_key_flag();
-			timeout = 500;
+//			timeout = 500;
 			if(lock_flag == 0 && key_value < KEY_SET_L_UP)
 			{
 //				beep_test();
@@ -104,37 +37,50 @@ int set_val(uint8_t addr, int* dat, char min, char max)
 			{
 				case KEY_OK_S:
 				{	
-					*dat = val;
+					dat = val;
 					status = val;
 					set_back_flag = 2;
-					goto back;
-
-				}
-				case KEY_RECORD_S:
-				{	
 					
-					*dat = val;
+					if(set_time_flag)
+					{
+						set_val_flag = 2;
+						goto back;
+					}
+					else if(set_meal_flag)
+					{
+						set_val_flag = 2;
+						goto back;
+					}
+				}
+					break;
+				
+				case KEY_RECORD_S:
+				{						
+					dat = val;
 					status = val;
 					set_back_flag = 1;
 					goto back;
 				}
+					break;
 				
 				case KEY_DOWN_S:
-				{
-					
+				{					
 					if(val > min)
 						val--;
 					else if(val == min)
 						val = max;
+					
+					timeout = 500;
 				}
 					break;
 									
 				case KEY_UP_S:
-				{
-					
+				{					
 					val++;
 					if (val > max)
 						val = min;
+					
+					timeout = 500;
 				}
 					break;
 			}
@@ -178,7 +124,8 @@ int set_val(uint8_t addr, int* dat, char min, char max)
 					}
 						break;
 					
-					default:break;
+					default:
+					break;
 				}				
 				if (max>9)
 				{
@@ -486,7 +433,7 @@ back:
 
 	}
 	
-	set_val_flag = 0;			//正在设置数值标志
+	set_val_flag = 0;			//脮媒脭脷脡猫脰脙脢媒脰碌卤锚脰戮
 
 	return status;
 }
@@ -502,7 +449,7 @@ int set_num_val(uint8_t addr, int* dat, char min, char max)
 	uint8_t lcd_update_time = 0;
 
 	UART_PRINTF("########## enter set_num_val \r\n");
-	set_val_flag = 1;						//正在设置数值标志
+	set_val_flag = 1;						//脮媒脭脷脡猫脰脙脢媒脰碌卤锚脰戮
 	Delay_ms(200);
 	while (timeout) 
 	{
@@ -516,7 +463,7 @@ int set_num_val(uint8_t addr, int* dat, char min, char max)
 
 		if (key_value) 
 		{			
-			lock_timeout = LOCK_TIMEOUT_TIME;//无操作20s后锁屏
+			lock_timeout = LOCK_TIMEOUT_TIME;//脦脼虏脵脳梅20s潞贸脣酶脝脕
 			clean_key_flag();
 			timeout = 500;
 			if(lock_flag == 0 && key_value < KEY_SET_L_UP)
@@ -784,7 +731,7 @@ back:
 
 	}
 	
-	set_val_flag = 0;			//正在设置数值标志
+	set_val_flag = 0;			//脮媒脭脷脡猫脰脙脢媒脰碌卤锚脰戮
 
 	return status;
 
@@ -801,7 +748,7 @@ int set_weight_val(uint8_t addr, int* dat, char min, char max)
 	uint8_t lcd_update_time = 0;
 
 	UART_PRINTF("########## enter set_val \r\n");
-	set_val_flag = 1;						//正在设置数值标志
+	set_val_flag = 1;						//脮媒脭脷脡猫脰脙脢媒脰碌卤锚脰戮
 	Delay_ms(200);
 	while (timeout) 
 	{
@@ -815,7 +762,7 @@ int set_weight_val(uint8_t addr, int* dat, char min, char max)
 
 		if (key_value) 
 		{			
-			lock_timeout = LOCK_TIMEOUT_TIME;//无操作20s后锁屏
+			lock_timeout = LOCK_TIMEOUT_TIME;//脦脼虏脵脳梅20s潞贸脣酶脝脕
 			clean_key_flag();
 			timeout = 500;
 			if(lock_flag == 0 && key_value < KEY_SET_L_UP)
@@ -1099,14 +1046,14 @@ back:
 
 	}
 	
-	set_val_flag = 0;			//正在设置数值标志
+	set_val_flag = 0;			//脮媒脭脷脡猫脰脙脢媒脰碌卤锚脰戮
 
 	return status;
 }
 
 
 
-//获取时间显示
+//禄帽脠隆脢卤录盲脧脭脢戮
 void get_time(void)
 {
 	static uint8_t first_time = 0;
@@ -1212,7 +1159,7 @@ void get_time(void)
 
 }
 
-//设置时间
+//脡猫脰脙脢卤录盲
 char set_time(void)
 {
 	int ret;
@@ -1237,7 +1184,7 @@ char set_time(void)
 			{
 				ret = tm_s.hour / 10;
 				ret2 = tm_s.hour % 10;
-				display_flag = 1;				//第一次显示第一位会导致后面显示异常，传数值进去显示一次第二位解决
+				display_flag = 1;				//碌脷脪禄麓脦脧脭脢戮碌脷脪禄脦禄禄谩碌录脰脗潞贸脙忙脧脭脢戮脪矛鲁拢拢卢麓芦脢媒脰碌陆酶脠楼脧脭脢戮脪禄麓脦碌脷露镁脦禄陆芒戮枚
 				display_val = ret2;
 
 				tm_s.hour = set_val(0, &ret, 0, 2);
@@ -1362,7 +1309,7 @@ char set_time(void)
 	return ret;
 }
 
-//获取喂食计划
+//禄帽脠隆脦鹿脢鲁录脝禄庐
 void get_meal(uint8_t num)
 {
 	static uint8_t reverse = 1;
@@ -1590,7 +1537,7 @@ void get_weight(uint8_t num)
 		}
 }
 
-//设置喂食计划
+//脡猫脰脙脦鹿脢鲁录脝禄庐
 char set_meal(void)
 {
 	FEED_INFO_t feed;
@@ -1624,7 +1571,7 @@ char set_meal(void)
 				ret = meal / 10;
 				ret2 = meal % 10;
 
-				display_flag = 1;				//第一次显示第一位会导致后面显示异常，传数值进去显示一次第二位解决
+				display_flag = 1;				//碌脷脪禄麓脦脧脭脢戮碌脷脪禄脦禄禄谩碌录脰脗潞贸脙忙脧脭脢戮脪矛鲁拢拢卢麓芦脢媒脰碌陆酶脠楼脧脭脢戮脪禄麓脦碌脷露镁脦禄陆芒戮枚
 				display_val = ret2;
 				UART_PRINTF("%02X  %02X\n",ret, ret2);
 
@@ -1673,7 +1620,7 @@ char set_meal(void)
 				ret = feed.hour / 10;
 				ret2 = feed.hour % 10;
 
-//				display_flag = 1;				//第一次显示第一位会导致后面显示异常，传数值进去显示一次第二位解决
+//				display_flag = 1;				//碌脷脪禄麓脦脧脭脢戮碌脷脪禄脦禄禄谩碌录脰脗潞贸脙忙脧脭脢戮脪矛鲁拢拢卢麓芦脢媒脰碌陆酶脠楼脧脭脢戮脪禄麓脦碌脷露镁脦禄陆芒戮枚
 //				display_val = ret2;
 				UART_PRINTF("%02X  %02X\n",ret, ret2);
 
@@ -1740,7 +1687,7 @@ char set_meal(void)
 				ret = feed.weight / 10;
 				ret2 = feed.weight % 10;
 				
-//				display_flag = 1;				//第一次显示第一位会导致后面显示异常，传数值进去显示一次第二位解决
+//				display_flag = 1;				//碌脷脪禄麓脦脧脭脢戮碌脷脪禄脦禄禄谩碌录脰脗潞贸脙忙脧脭脢戮脪矛鲁拢拢卢麓芦脢媒脰碌陆酶脠楼脧脭脢戮脪禄麓脦碌脷露镁脦禄陆芒戮枚
 //				display_val = ret2;				
 				UART_PRINTF("%02X  %02X\n",ret, ret2);
 				
@@ -2235,7 +2182,7 @@ char set_meal_1(uint8_t num)
 				ret = feed.hour / 10;
 				ret2 = feed.hour % 10;
 
-//				display_flag = 1;				//第一次显示第一位会导致后面显示异常，传数值进去显示一次第二位解决
+//				display_flag = 1;				//碌脷脪禄麓脦脧脭脢戮碌脷脪禄脦禄禄谩碌录脰脗潞贸脙忙脧脭脢戮脪矛鲁拢拢卢麓芦脢媒脰碌陆酶脠楼脧脭脢戮脪禄麓脦碌脷露镁脦禄陆芒戮枚
 //				display_val = ret2;
 				UART_PRINTF("%02X  %02X\n",ret, ret2);
 
@@ -2301,7 +2248,7 @@ char set_meal_1(uint8_t num)
 				ret = feed.weight / 10;
 				ret2 = feed.weight % 10;
 				
-//				display_flag = 1;				//第一次显示第一位会导致后面显示异常，传数值进去显示一次第二位解决
+//				display_flag = 1;				//碌脷脪禄麓脦脧脭脢戮碌脷脪禄脦禄禄谩碌录脰脗潞贸脙忙脧脭脢戮脪矛鲁拢拢卢麓芦脢媒脰碌陆酶脠楼脧脭脢戮脪禄麓脦碌脷露镁脦禄陆芒戮枚
 //				display_val = ret2;				
 				UART_PRINTF("%02X  %02X\n",ret, ret2);
 				
@@ -2550,560 +2497,3 @@ char set_meal_1(uint8_t num)
 	return ret;
 }
 
-
-//删除喂食计划
-void del_meal(uint8_t num)
-{
-	num =num - 1;
-	UART_PRINTF("########## enter del_meal \r\n");
-	memset(&feed_plan.plans[num], 0xff, sizeof(FEED_INFO_t));
-	
-//	flash_erase(FLASH_SPACE_TYPE_NVR,BLE_PLAN_ADDR,FLASH_SIZE_ONE);
-	flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR);
-	flash_write(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR, sizeof(FEED_PLAN_t), (uint8_t *)&feed_plan);
-}
-
-//显示电量
-void disp_voltage(void)
-{
-	uint16_t voltage = 0;
-
-	voltage = adc_get_value(1);
-	
-	if(voltage < 440 || voltage >= 680)			//460 = 2.4V
-	{
-//		ht1621_disp(POWER_0, 1);
-//		ht1621_disp(POWER_1, 1);
-//		ht1621_disp(POWER_2, 1);
-//		ht1621_disp(POWER_3, 1);
-//		ht1621_disp(POWER_4, 1);
-		
-		SEG9[8]|=0X01;
-		SEG9[8]|=0X04;
-		SEG9[8]|=0X20;
-		SEG9[9]|=0XF;
-		SEG9[10]|=0X10;
-		
-	}
-	else if (voltage < 570) 				//3.5
-	{
-//		ht1621_disp(POWER_0, 1);
-//		ht1621_disp(POWER_1, 0);
-//		ht1621_disp(POWER_2, 0);
-//		ht1621_disp(POWER_3, 0);
-//		ht1621_disp(POWER_4, 0);
-		
-		SEG9[8]&=~0X01;
-		SEG9[8]&=~0X04;
-		SEG9[8]&=~0X20;
-		SEG9[9]&=~0XF;
-		SEG9[10]|=0X10;
-
-		
-	} 
-	else if (voltage < 610) 				//3.7
-	{
-//		ht1621_disp(POWER_0, 1);
-//		ht1621_disp(POWER_1, 1);
-//		ht1621_disp(POWER_2, 0);
-//		ht1621_disp(POWER_3, 0);
-//		ht1621_disp(POWER_4, 0);
-		
-		SEG9[8]&=~0X01;
-		SEG9[8]&=~0X04;
-		SEG9[8]&=~0X20;
-		SEG9[9]|=0XF;
-		SEG9[10]|=0X10;
-		
-	} 
-	else if (voltage < 640) 				// = 3.9
-	{
-//		ht1621_disp(POWER_0, 1);
-//		ht1621_disp(POWER_1, 1);
-//		ht1621_disp(POWER_2, 1);
-//		ht1621_disp(POWER_3, 0);
-//		ht1621_disp(POWER_4, 0);
-		
-		SEG9[8]&=~0X01;
-		SEG9[8]&=~0X04;
-		SEG9[8]|=0X20;
-		SEG9[9]|=0XF;
-		SEG9[10]|=0X10;
-		
-	} 
-	else if (voltage < 680) 				// = 4.2
-	{
-//		ht1621_disp(POWER_0, 1);
-//		ht1621_disp(POWER_1, 1);
-//		ht1621_disp(POWER_2, 1);
-//		ht1621_disp(POWER_3, 1);
-//		ht1621_disp(POWER_4, 0);
-		
-		SEG9[8]&=~0X01;
-		SEG9[8]|=0X04;
-		SEG9[8]|=0X20;
-		SEG9[9]|=0X0F;
-		SEG9[10]|=0X10;
-		
-	} 
-
-}
-
-void play_record_control(void)
-{
-	gpio_set(SOUND_PLAY, PLAYER_ON);
-	Delay_ms(100);
-	gpio_set(SOUND_PLAY, PLAYER_OFF);
-}
-
-void record_reset_control(void)
-{
-	gpio_set(SOUND_REC, RECORD_ON);
-	#ifdef NEW_RECORD_IC
-	Delay_ms(1300);
-	#else
-	Delay_ms(600);	
-	#endif
-	gpio_set(SOUND_REC, RECORD_OFF);
-}
-
-void led_control(uint8_t link_led, uint8_t red_led, uint8_t led_level)
-{
-	#ifndef NO_LED_E
-	static uint8_t old_led_level = 0;
-	
-	if(led_level >= old_led_level || led_level == 0)
-	{
-//		UART_PRINTF("########## led_level:%d \r\n",led_level);
-		old_led_level = led_level;
-		
-		switch(link_led)
-		{
-			case LED_ON:
-				SET_LED_ON(LINK_LED);
-
-				break;
-			
-			case LED_OFF:
-				SET_LED_OFF(LINK_LED);
-				break;
-		}
-		
-		switch(red_led)
-		{
-			case LED_ON:
-				SET_LED_ON(PWR_LED);
-				break;
-			
-			case LED_OFF:
-				SET_LED_OFF(PWR_LED);
-				break;
-		}	
-	}
-	#endif
-}
-
-void lock_led(void)
-{
-	static uint8_t reverse = 0;
-	if(led_flag > 0)
-	{
-		if(reverse && (led_flag % 5 == 0))
-		{
-			SEG9[12]|=0X80;
-			reverse = 0;
-		}	
-		else if(reverse == 0)
-		{
-			SEG9[12]&=~0X80;
-			reverse = 1;
-		}	
-		led_flag --;						
-	}
-	
-}
-
-#ifdef BACKLIGHT_CONTROL
-PWM_DRV_DESC timer_desc_3;
-void update_backlight(uint8_t light)
-{
-	timer_desc_3.duty_cycle = light;
-	pwm_set_duty(&timer_desc_3);
-}
-void backlight_init(void)
-{	
-	timer_desc_3.channel = 4;
-	timer_desc_3.mode = 1<<0 | 0<<1 | 0<<2 | 0<<4;
-	timer_desc_3.end_value = 6;
-	timer_desc_3.duty_cycle = 0;
-	pwm_init(&timer_desc_3);
-}
-void set_backlight(uint8_t *pwm, uint8_t up)
-{
-	if(up) 
-	{
-		if(*pwm <= 6)
-			*pwm += 1;
-	} 
-	else 
-	{
-		if (*pwm > 1)
-			*pwm -= 1;
-	}
-		
-	update_backlight(*pwm);
-}
-#endif
-uint8_t key_value = 0;				//按键触发哪个按键
-uint8_t meal = 0;					//菜单
-
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ PT01K_BK
-#ifdef PT01K_BK
-void key_func(void)
-{		
-	key_value = key_scan();
-	
-	if(lock_flag)
-	{
-		if(key_value == KEY_LOCK_L && lock_flag)	
-		{
-			clean_key_flag();
-						
-			lock_flag = 0;
-			
-			unlock_flag = 1;
-			led_flag = 10;
-						
-			beep_test();						//蜂鸣器播音
-			UART_PRINTF("########## lock_flag == 0 \r\n");
-			lock_timeout = LOCK_TIMEOUT_TIME;
-		}
-		else if(key_value == KEY_LOCK_L_UP)
-		{			
-			lock_flag = 0;
-			lock_timeout = LOCK_TIMEOUT_TIME;
-		}
-		key_flag = 0;
-		key_scan_flag = 0;
-	}
-	else if(key_value)
-	{
-		clean_key_flag();
-		lock_timeout = LOCK_TIMEOUT_TIME;
-		if(lock_flag == 0 && key_value < KEY_SET_L_UP)
-		{
-//			beep_test();
-//			lock_timeout = LOCK_TIMEOUT_TIME;
-			beep_flag = 0;
-		}
-
-		switch (key_value) 	
-		{	
-			case KEY_OK_L:
-			{
-				if(meal)
-					set_meal_1(meal);
-				else
-					set_time();
-								
-			}
-				break;			
-			
-			case KEY_FEED_L:	//长按删除喂食条目
-			{								
-				if (meal) 
-				{
-					del_meal(meal);
-				}
-			}
-				break;
-				
-			case KEY_RECORD_L:			//录音
-			{								
-				record_flag = 1;
-			}
-				break;
-
-			case KEY_RECORD_L_UP:		//录音结束
-			{								
-				record_flag = 0;
-			}
-				break;
-			
-			case KEY_FEED_S:	//手动喂食
-			{				
-				feed_info_func.hour = 0;
-				feed_info_func.minute = 0;
-				feed_info_func.weight = 1;//改
-				#ifdef FEED_KEY_MUSIC_E
-				feed_info_func.music = 1;
-				#else
-				feed_info_func.music = 0;
-				#endif
-				feed_run(&feed_info_func);
-			}
-				break;
-			
-			case KEY_UP_S:
-			{				
-				meal++;
-				if(meal > 10)
-				{
-					meal = 0;
-				}
-			}
-				break;
-			
-			case KEY_DOWN_S:
-			{				
-				if(meal > 0)
-				{
-					meal--;
-				}
-				else 
-				{
-					meal = 10;
-				}
-			}
-				break;
-									
-			case KEY_SET_S:	
-			{				
-				if(meal && get_meal_flag == 1)
-				{
-					meal = 0;
-				}
-			}
-				break;			
-		}
-		
-		if (meal) 
-		{
-			get_feed_info_flag = 1;
-			get_meal_flag = 1;
-			get_feed_num(meal);
-			
-				if(key_value == KEY_SET_L)
-				{
-					get_meal_flag = 2;
-					get_meal(meal);
-				}		
-				else if(key_value == KEY_LOCK_L)
-				{
-					get_meal_flag = 3;
-					get_weight(meal);
-				}
-		}
-		else
-		{
-			get_feed_info_flag = 0;
-			get_meal_flag = 0;
-			get_time();
-		}
-		
-		key_flag = 0;
-		key_scan_flag = 0;
-
-	}
-	else 		//二十秒后没有按键，重新锁键
-	{
-		if (lock_timeout == 0) 
-		{
-			UART_PRINTF("########## lock_timeout == 0  lock@@@@@@\r\n");
-
-			get_feed_info_flag = 0;
-			set_time_flag = 0;
-						
-			lock_flag = 1;					//设备锁标志
-			
-			unlock_flag = 0;
-			
-			key_scan_flag = 0;
-			
-			meal = 0;
-		}
-	}
-}
-#endif
-
-
-#ifdef FEED_INFO_AUTO_TEST
-#define u8 uint8_t
-u8 test_feed_info_flag = 0;
-
-void test_feed_info()
-{
-	UTCTimeStruct tm_s;
-
-	utc_get_time(&tm_s);
-	
-	FEED_PLAN_t flash_feed_info;
-	
-	u8 i;
-	u8 hour_test;
-	u8 min_test;
-	static u8 hour_old = 250;
-	static u8 min_old = 25;
-	
-	if(test_feed_info_flag == 0)		//if(test_feed_info_flag == 0 && tm_s.year > 20)
-	{
-        #ifdef TY_PROTOCOL
-        for(i = 0; i < FEED_MAX_NUM; i++)
-        {
-//            flash_feed_info.plans[i].week = 0x7F;
-            if((tm_s.minutes + (2 * i) + 2) >= 60)
-            {
-                min_test = tm_s.minutes + (2 * i) + 2 - 60;
-                hour_test = tm_s.hour + 1;
-                if(hour_test >= 24)
-                    hour_test = hour_test - 24;
-            }
-            else
-            {
-                min_test =  tm_s.minutes + (2 * i) + 2;  
-                hour_test = tm_s.hour;
-            }
-            flash_feed_info.plans[i].minute = min_test;
-            flash_feed_info.plans[i].hour = hour_test;
-            flash_feed_info.plans[i].weight = i;
-//            flash_feed_info.plans[i].allow_feed = 1;
-	    }
-		#else
-        for(i = 0; i < FEED_MAX_NUM; i++)
-        {
-            if((tm_s.minutes + (2 * i) + 2) >= 60)
-            {
-                min_test = tm_s.minutes + (2 * i) + 2 - 60;
-                hour_test = tm_s.hour + 1;
-                if(hour_test >= 24)
-                    hour_test = hour_test - 24;
-            }
-            else
-            {
-                min_test =  tm_s.minutes + (2 * i) + 2;  
-                hour_test = tm_s.hour;
-            }
-//            flash_feed_info.plans[i].year = tm_s.year;
-//            flash_feed_info.plans[i].month = tm_s.month;
-//            flash_feed_info.plans[i].mday = 0x7F;
-            flash_feed_info.plans[i].hour = hour_test;
-            flash_feed_info.plans[i].minute = min_test;
-//            printf("min_test:%d \n",min_test);
-
-			flash_feed_info.plans[i].weight = 2 * (10 - i) + 1;
-			
-//            flash_feed_info.plans[i].weight_l = i * 10 + 10;
-//            flash_feed_info.plans[i].weight_h = 0;
-//            
-//            flash_feed_info.plans[i].mode = 0x11;
-//            flash_feed_info.plans[i].num = i + 1;
-			
-            flash_feed_info.plans[i].music = 1;
-	    }        
-        #endif
-		
-		delay_ms(100);
-		test_feed_info_flag = 1;
-		
-		hour_old = hour_test;
-		min_old = min_test;
-		
-		
-		flash_erase_sector(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR);
-		flash_write(FLASH_SPACE_TYPE_NVR, BLE_PLAN_ADDR, sizeof(FEED_PLAN_t), (uint8_t *)&flash_feed_info);
-		
-//		user_write_flash(FLASH_FEED_INFO_ADDR,(u8 *) &flash_feed_info, sizeof(FLASH_FEED_INFO_E));
-		
-//		#ifdef TY_PROTOCOL
-//		send_feed_info();
-//		#else
-//		for(i = 0; i < FEED_MAX_NUM; i++)
-//		{
-//			cmd_result(0x02, (u8 *) &flash_feed_info.feed_info[i], sizeof(struct feed_infos));
-//		}
-//		#endif
-		
-//    	printf_rtc();
-//	    printf_feed_info();
-
-		UART_PRINTF("%04d-%02d-%02d %02d:%02d:%02d \r\n",
-			tm_s.year, tm_s.month, tm_s.day,
-			tm_s.hour, tm_s.minutes, tm_s.seconds);
-
-		uint8_t a;	
-		for(a = 0; a < 10; a++)
-		{
-			UART_PRINTF("%02X-%02X-%02X\n",flash_feed_info.plans[a].hour,flash_feed_info.plans[a].minute,flash_feed_info.plans[a].weight);	
-		}
-
-		
-	}
-    else if(hour_old <= tm_s.hour && min_old <= tm_s.minutes)
-    {
-//        printf_rtc();
-        test_feed_info_flag = 0;
-    }
-    
-}
-#endif
-
-
-void printf_flash_info(void)
-{
-	uint8_t a;
-	
-	for(a = 0; a < 10; a++)
-	{
-		UART_PRINTF("%02X:%02X-%02X-%02X\n",a+1, feed_plan.plans[a].hour,feed_plan.plans[a].minute,feed_plan.plans[a].weight);	
-	}
-	UART_PRINTF("record_time:%d\n",save_info.record_time);	
-	UART_PRINTF("rtc_timestamp:%d-%d\n",save_info.rtc_hour, save_info.rtc_minute);	
-	UART_PRINTF("led_backlight_pwm:%d\n",save_info.led_backlight_pwm);	
-}
-
-void feed_error_led()
-{
-	static uint8_t led_static;
-	static uint8_t dc_led_flag = 0;
-	
-	if(feed_error > 0)
-	{
-		if(led_static != LED_OFF)
-		{
-			led_control(LED_OFF,LED_OFF,4);
-			led_static = LED_OFF;
-		}
-		else if(led_static != LED_ON)
-		{
-			led_control(LED_OFF,LED_ON,4);
-			led_static = LED_ON;
-		}
-	}
-	else if(led_static == LED_ON || led_static == LED_OFF)
-	{
-		led_control(LED_ON,LED_NO,0);
-		led_static = LED_NO;
-	}
-	else if(gpio_get_input(CHARGE_DET) <= 0)
-	{
-		led_control(LED_OFF,LED_ON,3);
-		dc_led_flag = 1;
-	}
-	else if(gpio_get_input(CHARGE_DET))
-	{
-		if(dc_led_flag)
-		{
-			if(lock_flag == 0)
-				led_control(LED_ON,LED_OFF,0);
-			else
-				led_control(LED_NO,LED_OFF,0);
-			
-			dc_led_flag = 0;
-		}
-		else
-		{
-			led_control(LED_NO,LED_OFF,2);
-		}
-	}
-
-}

@@ -1,0 +1,90 @@
+#ifdef FEED_INFO_AUTO_TEST
+u8 test_feed_info_flag = 0;
+
+void test_feed_info()
+{
+	u8 i;
+	u8 hour_test;
+	u8 min_test;
+	static u8 hour_old = 250;
+	static u8 min_old = 25;
+    
+    if(test_feed_info_flag == 0 && rtc_date.year > 20)
+    {
+        #ifdef TY_PROTOCOL
+        for(i = 0; i < FEED_MAX_NUM; i++)
+        {
+            flash_feed_info.feed_info[i].week = 0x7F;
+            if((rtc_date.minute + (5 * i) + 3) >= 60)
+            {
+                min_test = rtc_date.minute + (5 * i) + 3 - 60;
+                hour_test = rtc_date.hour + 1;
+                if(hour_test >= 24)
+                    hour_test = hour_test - 24;
+            }
+            else
+            {
+                min_test =  rtc_date.minute + (5 * i) + 3;  
+                hour_test = rtc_date.hour;
+            }
+            flash_feed_info.feed_info[i].minute = min_test;
+            flash_feed_info.feed_info[i].hour = hour_test;
+            flash_feed_info.feed_info[i].weight = i;
+            flash_feed_info.feed_info[i].allow_feed = 1;
+	    }
+        #else
+        for(i = 0; i < FEED_MAX_NUM; i++)
+        {
+            if((rtc_date.minute + (5 * i) + 3) >= 60)
+            {
+                min_test = rtc_date.minute + (5 * i) + 3 - 60;
+                hour_test = rtc_date.hour + 1;
+                if(hour_test >= 24)
+                    hour_test = hour_test - 24;
+            }
+            else
+            {
+                min_test =  rtc_date.minute + (5 * i) + 3;  
+                hour_test = rtc_date.hour;
+            }
+            flash_feed_info.feed_info[i].year = rtc_date.year;
+            flash_feed_info.feed_info[i].month = rtc_date.month;
+            flash_feed_info.feed_info[i].mday = 0x7F;
+            flash_feed_info.feed_info[i].hour = hour_test;
+            flash_feed_info.feed_info[i].minute = min_test;
+//            printf("min_test:%d \n",min_test);
+            
+            flash_feed_info.feed_info[i].weight_l = i * 10 + 10;
+            flash_feed_info.feed_info[i].weight_h = 0;
+            
+            flash_feed_info.feed_info[i].mode = 0x11;
+            flash_feed_info.feed_info[i].num = i + 1;
+            flash_feed_info.feed_info[i].music = 0;
+	    }        
+        #endif
+		delay_ms(100);
+        test_feed_info_flag = 1;
+        
+        hour_old = hour_test;
+        min_old = min_test;
+        
+		user_write_flash(FLASH_FEED_INFO_ADDR,(u8 *) &flash_feed_info, sizeof(FLASH_FEED_INFO_E));
+		#ifdef TY_PROTOCOL
+		send_feed_info();
+		#else
+		for(i = 0; i < FEED_MAX_NUM; i++)
+		{
+			cmd_result(0x02, (u8 *) &flash_feed_info.feed_info[i], sizeof(struct feed_infos));
+		}
+		#endif
+    	printf_rtc();
+	    printf_feed_info();
+    }
+    else if(hour_old <= rtc_date.hour && min_old <= rtc_date.minute)
+    {
+//        printf_rtc();
+        test_feed_info_flag = 0;
+    }
+    
+}
+#endif

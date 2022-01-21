@@ -7,16 +7,31 @@
 
 void get_time(void);
 char set_time(void);
+
 void get_meal(uint8_t num);
-char set_meal(uint8_t num);
+void get_feed_num(uint8_t num);
+void get_weight(uint8_t num);
+
+char set_meal(void);
+
+char set_meal_1(uint8_t num);
+
+
 void del_meal(uint8_t num);
+
 void disp_voltage(void);
+
 uint8_t key_scan(void);
 void key_func(void);
+
+void test_feed_info(void);
+
 void play_record_control(void);
 void record_reset_control(void);
 void update_backlight(uint8_t light);
 void backlight_init(void);
+
+void lock_led(void);
 
 extern uint8_t key_scan_flag;				//检测按键标志
 extern uint16_t key_set_t;
@@ -36,5 +51,6 @@ extern uint32_t lock_key_tick;				//锁键按键计时
 extern uint32_t feed_key_tick;				//喂食按键计时
 extern uint32_t record_key_tick;			//录音按键计时
 
+extern uint32_t ok_key_tick;
 
 #endif
